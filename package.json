@@ -1,0 +1,17 @@
+{
+  "name": "canon_notifier",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Empty readme",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.830.0",
+    "@aws-sdk/client-secrets-manager": "^3.830.0",
+    "jsdom": "^26.1.0"
+  }
+}
