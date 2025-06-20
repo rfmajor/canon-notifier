@@ -9,8 +9,9 @@ const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
 
-const canonUrl = "https://www.canon.pl/store/canon-dalmierz-laserowy-canon-powershot-golf/6254C002/"
+const canonUrl = "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
 const canonSiteRegex = "chakra-text css-19qxpy"
+const minSmsIntervalMs = 1000 * 60 * 60 * 12 // 12 hours
 
 export const handler = async (_) => {
   let twilioApiKey;
@@ -80,14 +81,16 @@ export const handler = async (_) => {
   if (available) {
     const now = new Date();
     // check if the message was already sent in the last 12 hours
-    if (lastSentSMSMessage && now.getTime() - lastSentSMSMessage.getTime() < 1000 * 60 * 60 * 12) {
-        console.log(`SMS was already sent on ${lastSentSMSMessage}, skipping`)
+    const timeDiff = lastSentSMSMessage && now.getTime() - lastSentSMSMessage.getTime()
+    console.log(`Last SMS was sent on ${lastSentSMSMessage} (${timeDiff / 1000 / 60 / 60} hours ago)`)
+    if (timeDiff < minSmsIntervalMs) {
+        console.log("Skipping SMS")
         return {
           statusCode: 200,
           body: "SMS already sent"
         };
     }
-    console.log(`SMS was sent on ${lastSentSMSMessage}, proceeding`)
+    console.log("Proceeding with sending SMS")
     const command = new PutItemCommand({
       TableName: "AvailabilityTimestamp",
       Item: {
