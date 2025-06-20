@@ -9,7 +9,7 @@ const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
 
-const canonUrl = "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
+const canonUrl = "https://www.canon.pl/store/canon-dalmierz-laserowy-canon-powershot-golf/6254C002/"
 const canonSiteRegex = "chakra-text css-19qxpy"
 
 export const handler = async (_) => {
@@ -81,11 +81,13 @@ export const handler = async (_) => {
     const now = new Date();
     // check if the message was already sent in the last 12 hours
     if (lastSentSMSMessage && now.getTime() - lastSentSMSMessage.getTime() < 1000 * 60 * 60 * 12) {
-      return {
-        statusCode: 200,
-        body: "SMS already sent"
-      };
+        console.log(`SMS was already sent on ${lastSentSMSMessage}, skipping`)
+        return {
+          statusCode: 200,
+          body: "SMS already sent"
+        };
     }
+    console.log(`SMS was sent on ${lastSentSMSMessage}, proceeding`)
     const command = new PutItemCommand({
       TableName: "AvailabilityTimestamp",
       Item: {
@@ -105,10 +107,10 @@ export const handler = async (_) => {
       };
     }
 
-    console.log("Sending the SMS about availability")
     try {
       const twilioClient = twilio(accountSid, twilioApiKey);
-      twilioClient.messages.create({
+      console.log("Sending the SMS about availability")
+      await twilioClient.messages.create({
         body: `Canon is available at ${canonUrl}`,
         messagingServiceSid: 'MGb1ec5e8e4e7b2608d79542695b053f7b',
         to: '+48515050764'
