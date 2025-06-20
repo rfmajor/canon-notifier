@@ -12,6 +12,6 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.830.0",
     "@aws-sdk/client-secrets-manager": "^3.830.0",
-    "jsdom": "^26.1.0"
+    "twilio": "^5.7.1"
   }
 }

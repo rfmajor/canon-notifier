@@ -1,6 +1,6 @@
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { JSDOM } from 'jsdom';
+import twilio from "twilio"
 
 const accountSid = 'AC9c1d277addb59f56e9a1b59ecf351b94';
 
@@ -9,11 +9,12 @@ const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
 
-// const canonUrl = "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
-const canonUrl = "https://www.canon.pl/store/canon-dalmierz-laserowy-canon-powershot-golf/6254C002/"
+const canonUrl = "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
+const canonSiteRegex = "chakra-text css-19qxpy"
 
 export const handler = async (_) => {
   let twilioApiKey;
+  console.log("Retrieving twilio key")
   try {
     const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
     const secretResponse = await secretsClient.send(secretCommand);
@@ -32,10 +33,11 @@ export const handler = async (_) => {
   const params = {
     TableName: "AvailabilityTimestamp",
     Key: {
-      id: { N: 1 }
+      ID: { N: "1" }
     }
   };
 
+  console.log("Retrieving last sent timestamp of the SMS")
   let lastSentSMSMessage;
   try {
     const command = new GetItemCommand(params);
@@ -49,7 +51,7 @@ export const handler = async (_) => {
     }
 
     const dateValue = data.Item.Timestamp.S;
-    lastSentSMSMessage = new Date(dateValue);
+    lastSentSMSMessage = dateValue ? new Date(dateValue) : new Date(0)
   } catch (err) {
     console.error("DynamoDB error:", err);
     return {
@@ -60,12 +62,13 @@ export const handler = async (_) => {
 
   let available = false
   try {
+    console.log("Fetching canon availability")
     const response = await fetch(canonUrl)
     const data = await response.text()
   
-    const dom = new JSDOM(data);
-  
-    available = !dom.window.document.querySelector(".chakra-text.css-19qxpy")
+    console.log("Response received. Checking for availability")
+    available = !data.includes(canonSiteRegex)
+    console.log(`Canon available: ${available}`)
   } catch (err) {
     console.error("Error fetching data:", err);
     return {
@@ -86,11 +89,12 @@ export const handler = async (_) => {
     const command = new PutItemCommand({
       TableName: "AvailabilityTimestamp",
       Item: {
-        id: { N: 1 },
+        ID: { N: "1" },
         Timestamp: { S: now.toISOString() }
       }
     });
 
+    console.log("Overwriting the timestamp row")
     try {
       await dbClient.send(command);
     } catch (err) {
@@ -101,8 +105,9 @@ export const handler = async (_) => {
       };
     }
 
+    console.log("Sending the SMS about availability")
     try {
-      const twilioClient = require('twilio')(accountSid, twilioApiKey);
+      const twilioClient = twilio(accountSid, twilioApiKey);
       twilioClient.messages.create({
         body: `Canon is available at ${canonUrl}`,
         messagingServiceSid: 'MGb1ec5e8e4e7b2608d79542695b053f7b',
@@ -117,11 +122,8 @@ export const handler = async (_) => {
       };
     }
   }
-  
   return {
-    statusCode: 200,
-    body: JSON.stringify('SMS sent successfully'),
+      statusCode: 200,
+      body: JSON.stringify('Lambda finished successfully'),
   };
 };
-
-handler({})
