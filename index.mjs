@@ -1,7 +1,7 @@
 import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import smsClient from './smsClient.mjs'
-import checkAvailability from './availabilityCheck.mjs'
+import { sendAvailabilityMessage } from './smsClient.mjs'
+import { checkAvailability } from './availabilityCheck.mjs'
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
@@ -38,7 +38,7 @@ export const handler = async (_) => {
     };
   }
 
-  let availability = {}
+  let availability
   try {
     availability = await checkAvailability(sites)
   } catch (err) {
@@ -49,6 +49,7 @@ export const handler = async (_) => {
     };
   }
 
+  console.log(availability)
   let anyAvailable = false
   for (let a of availability) {
     if (a["available"]) {
@@ -167,7 +168,7 @@ export const handler = async (_) => {
   }
 
   try {
-    await smsClient.sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
+    await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
   } catch (err) {
     console.error("Error sending SMS:", err);
     return {

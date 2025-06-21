@@ -8,7 +8,7 @@ export async function checkAvailability(sites) {
     }
     const resolvedPromises = await Promise.all(promises)
 
-    return resolvedPromises.map(r => r.value);
+    return resolvedPromises
 }
 
 async function checkSite(siteName, siteUrl) {

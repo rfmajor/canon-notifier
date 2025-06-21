@@ -2,6 +2,6 @@
 
 FILE=deploy.zip
 
-zip --quiet -r "$FILE" index.mjs node_modules package.json package-lock.json
+zip --quiet -r "$FILE" ./*.mjs node_modules package.json package-lock.json
 printf "File size: %s\n" "$(du -h $FILE | cut -f 1 | xargs)"
 
