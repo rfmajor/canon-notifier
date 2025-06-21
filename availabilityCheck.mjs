@@ -24,6 +24,9 @@ async function checkSite(siteName, siteUrl) {
           case 'canon': 
               available = checkCanon(data)
               break
+          case 'fotoplus':
+              available = checkFotoplus(data)
+              break
           default:
               break
         }
@@ -39,3 +42,18 @@ async function checkSite(siteName, siteUrl) {
 function checkCanon(data) {
     return !data.includes(canonSiteRegex)
 }
+
+function checkFotoplus(data) {
+    const checkFotoplusInner = function(data, keyword) {
+        const str = data.substring(data.indexOf(keyword))
+        const startIndex = str.indexOf("data-title")
+        const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
+        const roi = str.substring(startIndex, endIndex)
+
+        return roi.includes('dostępny')
+    }
+    return checkFotoplusInner(data, 'SKLEP INTERNETOWY') ||
+        checkFotoplusInner(data, 'KRAKÓW') || 
+        checkFotoplusInner(data, 'KATOWICE')
+}
+
