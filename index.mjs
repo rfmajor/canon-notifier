@@ -1,27 +1,34 @@
-import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import twilio from "twilio"
-
-const accountSid = 'AC9c1d277addb59f56e9a1b59ecf351b94';
+import smsClient from './smsClient.mjs'
+import checkAvailability from './availabilityCheck.mjs'
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
 
-const canonUrl = "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
-const canonSiteRegex = "chakra-text css-19qxpy"
-const minSmsIntervalMs = 1000 * 60 * 60 * 12 // 12 hours
+const sites = {
+    "canon": {
+        "id": "1",
+        "url": "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/",
+    }
+}
+
+const minSmsIntervalHours = 12 
+const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
 export const handler = async (_) => {
   let twilioApiKey;
-  console.log("Retrieving twilio key")
+  let accountSid;
+  console.log("Retrieving twilio API key and accountSid")
   try {
     const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
     const secretResponse = await secretsClient.send(secretCommand);
 
     const parsedSecret = JSON.parse(secretResponse.SecretString);
     twilioApiKey = parsedSecret["shopping-api-key"];
+    accountSid = parsedSecret["shopping-api-sid"];
     if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
   } catch (err) {
     console.error("Error retrieving twilio secret:", err);
@@ -31,45 +38,9 @@ export const handler = async (_) => {
     };
   }
 
-  const params = {
-    TableName: "AvailabilityTimestamp",
-    Key: {
-      ID: { N: "1" }
-    }
-  };
-
-  console.log("Retrieving last sent timestamp of the SMS")
-  let lastSentSMSMessage;
+  let availability = {}
   try {
-    const command = new GetItemCommand(params);
-    const data = await dbClient.send(command);
-
-    if (!data.Item) {
-      return {
-        statusCode: 404,
-        body: "Last timestamp not found"
-      };
-    }
-
-    const dateValue = data.Item.Timestamp.S;
-    lastSentSMSMessage = dateValue ? new Date(dateValue) : new Date(0)
-  } catch (err) {
-    console.error("DynamoDB error:", err);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error"
-    };
-  }
-
-  let available = false
-  try {
-    console.log("Fetching canon availability")
-    const response = await fetch(canonUrl)
-    const data = await response.text()
-  
-    console.log("Response received. Checking for availability")
-    available = !data.includes(canonSiteRegex)
-    console.log(`Canon available: ${available}`)
+    availability = await checkAvailability(sites)
   } catch (err) {
     console.error("Error fetching data:", err);
     return {
@@ -78,54 +49,131 @@ export const handler = async (_) => {
     };
   }
 
-  if (available) {
-    const now = new Date();
-    // check if the message was already sent in the last 12 hours
-    const timeDiff = lastSentSMSMessage && now.getTime() - lastSentSMSMessage.getTime()
-    console.log(`Last SMS was sent on ${lastSentSMSMessage} (${timeDiff / 1000 / 60 / 60} hours ago)`)
-    if (timeDiff < minSmsIntervalMs) {
-        console.log("Skipping SMS")
-        return {
+  let anyAvailable = false
+  for (let a of availability) {
+    if (a["available"]) {
+        anyAvailable = true
+        break
+    }
+  }
+
+  if (!anyAvailable) {
+      console.log("No products available, skipping")
+      return {
           statusCode: 200,
-          body: "SMS already sent"
-        };
+          body: JSON.stringify('Lambda finished successfully'),
+      };
+  }
+  const urlsIds = []
+  for (let siteData of Object.values(sites)) {
+    urlsIds.push({
+      ID : { N: siteData['id'] }
+    })
+  }
+  const readParams = {
+    RequestItems: {
+        AvailabilityTimestamp: {
+            Keys: urlsIds
+        }
     }
-    console.log("Proceeding with sending SMS")
-    const command = new PutItemCommand({
-      TableName: "AvailabilityTimestamp",
-      Item: {
-        ID: { N: "1" },
-        Timestamp: { S: now.toISOString() }
+  };
+
+  console.log("Retrieving last sent timestamps of the SMS")
+  const lastSentSmsMessages = {};
+  try {
+    const getItemCommand = new BatchGetItemCommand(readParams)
+    const data = await dbClient.send(getItemCommand);
+
+    const responses = data.Responses.AvailabilityTimestamp
+    for (let response of responses) {
+      lastSentSmsMessages[response['ID']['N']] = response['Timestamp']['S']
+    }
+  } catch (err) {
+    console.error("DynamoDB error:", err);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error"
+    };
+  }
+
+  const putRequests = []
+  const smsUrls = []
+  const now = new Date();
+  for (let [siteId, lastSent] of Object.entries(lastSentSmsMessages)) {
+      let siteName = ''
+      for (let name of Object.keys(sites)) {
+          if (sites[name]['id'] == siteId) {
+              siteName = name
+              break
+          }
       }
-    });
+      let siteAvailability = {}
+      for (let a of availability) {
+          if (a["siteName"] == siteName) {
+              siteAvailability = a
+              break
+          }
+      }
+      if (!siteAvailability["available"]) {
+          console.log(`No product available for ${siteName}`)
+          continue
+      }
+      const lastSentDate = lastSent ? new Date(lastSent) : new Date(0)
+      const timeDiff = now.getTime() - lastSentDate.getTime()
 
+      console.log(`${siteName} is available, last SMS was sent on ${lastSentDate} (${timeDiff / 1000 / 60 / 60} hours ago)`)
+      if (siteAvailability["available"]) {
+          if (timeDiff < minSmsIntervalMs) {
+              console.log(`Skipping SMS for ${siteName}`)
+          } else {
+              putRequests.push({
+                  PutRequest: {
+                      Item: {
+                          ID: { N: siteId },
+                          Timestamp: { S: now.toISOString() }
+                      }
+                  }
+              })
+              smsUrls.push(sites[siteName]["url"])
+          }
+      }
+  }
+
+  if (smsUrls.length == 0) {
+      console.log("No SMS messages to be sent")
+      return {
+          statusCode: 200,
+          body: JSON.stringify('Lambda finished successfully'),
+      };
+  }
+
+  console.log("Proceeding with sending SMS")
+  const writeParams = {
+    RequestItems: {
+        AvailabilityTimestamp: putRequests
+    }
+  };
+  const command = new BatchWriteItemCommand(writeParams)
+
+  try {
     console.log("Overwriting the timestamp row")
-    try {
-      await dbClient.send(command);
-    } catch (err) {
-      console.error("Error updating DynamoDB:", err);
-      return {
-        statusCode: 500,
-        body: "Error updating DynamoDB"
-      };
-    }
+    await dbClient.send(command);
+  } catch (err) {
+    console.error("Error updating DynamoDB:", err);
+    return {
+      statusCode: 500,
+      body: "Error updating DynamoDB"
+    };
+  }
 
-    try {
-      const twilioClient = twilio(accountSid, twilioApiKey);
-      console.log("Sending the SMS about availability")
-      await twilioClient.messages.create({
-        body: `Canon is available at ${canonUrl}`,
-        messagingServiceSid: 'MGb1ec5e8e4e7b2608d79542695b053f7b',
-        to: '+48515050764'
-      })
-      .then(message => console.log(message.sid));
-    } catch (err) {
-      console.error("Error sending SMS:", err);
-      return {
-        statusCode: 500,
-        body: "Error sending SMS"
-      };
-    }
+  try {
+    await smsClient.sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
+  } catch (err) {
+    console.error("Error sending SMS:", err);
+    return {
+      statusCode: 500,
+      body: "Error sending SMS"
+    };
   }
   return {
       statusCode: 200,
