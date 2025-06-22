@@ -50,33 +50,43 @@ async function checkSite(siteName, siteUrl, browser) {
 }
 
 async function checkCanon(url) {
-    const response = await fetch(url)
-    if (!response.ok) {
-        throw new Error(`Invalid response status for canon: ${response.status}`)
+    try {
+        const response = await fetch(url)
+        if (!response.ok) {
+            throw new Error(`Invalid response status for canon: ${response.status}`)
+        }
+        const data = await response.text()
+        return !data.includes("chakra-text css-19qxpy")
+    } catch (err) {
+        console.log("Error while checking canon availability: " + err)
+        return false
     }
-    const data = await response.text()
-    return !data.includes("chakra-text css-19qxpy")
 }
 
 async function checkFotoplus(url) {
-    const response = await fetch(url)
-    if (!response.ok) {
-        throw new Error(`Invalid response status for fotoplus: ${response.status}`)
+    try {
+        const response = await fetch(url)
+        if (!response.ok) {
+            throw new Error(`Invalid response status for fotoplus: ${response.status}`)
+        }
+        const data = await response.text()
+
+        const checkFotoplusInner = function(data, keyword) {
+            const str = data.substring(data.indexOf(keyword))
+            const startIndex = str.indexOf("data-title")
+            const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
+            const roi = str.substring(startIndex, endIndex)
+
+            return roi.includes('dostępny')
+        }
+
+        return checkFotoplusInner(data, 'SKLEP INTERNETOWY') ||
+            checkFotoplusInner(data, 'KRAKÓW') || 
+            checkFotoplusInner(data, 'KATOWICE')
+    } catch (err) {
+        console.log("Error while checking fotoplus availability: " + err)
+        return false
     }
-    const data = await response.text()
-
-    const checkFotoplusInner = function(data, keyword) {
-        const str = data.substring(data.indexOf(keyword))
-        const startIndex = str.indexOf("data-title")
-        const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
-        const roi = str.substring(startIndex, endIndex)
-
-        return roi.includes('dostępny')
-    }
-
-    return checkFotoplusInner(data, 'SKLEP INTERNETOWY') ||
-        checkFotoplusInner(data, 'KRAKÓW') || 
-        checkFotoplusInner(data, 'KATOWICE')
 }
 
 async function checkMediamarkt(url, browser) {
