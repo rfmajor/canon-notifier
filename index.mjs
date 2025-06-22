@@ -44,10 +44,6 @@ try {
     if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
   } catch (err) {
     logger.error("Error retrieving twilio secret:", err);
-    return {
-      statusCode: 500,
-      body: "Error retrieving twilio secret"
-    };
 }
 
 export const handler = async (_) => {
