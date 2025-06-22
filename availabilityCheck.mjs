@@ -1,17 +1,7 @@
 import puppeteer from 'puppeteer'
 
 export async function checkAvailability(sites) {
-    const browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(
-            process.env.AWS_EXECUTION_ENV
-                ? '/opt/nodejs/node_modules/@sparticuz/chromium/bin'
-                : undefined,
-        ),
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-    });
+    const browser = await puppeteer.launch();
 
     const promises = []
     for (const [siteName, siteData] of Object.entries(sites)) {
