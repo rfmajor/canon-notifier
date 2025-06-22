@@ -12,6 +12,8 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.830.0",
     "@aws-sdk/client-secrets-manager": "^3.830.0",
+    "@sparticuz/chromium": "^137.0.1",
+    "puppeteer-core": "^24.6.1",
     "twilio": "^5.7.1"
   }
 }
