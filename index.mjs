@@ -2,6 +2,7 @@ import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
+import cron from 'node-cron';
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
@@ -200,3 +201,5 @@ export const handler = async (_) => {
       body: JSON.stringify('Lambda finished successfully'),
   };
 };
+
+cron.schedule('* * * * *', async () => await handler({}));

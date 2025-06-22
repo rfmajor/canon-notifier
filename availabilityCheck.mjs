@@ -1,16 +1,15 @@
 export async function checkAvailability(sites) {
-    const browser = undefined
-    // const browser = await puppeteer.launch({
-    //     args: chromium.args,
-    //     defaultViewport: chromium.defaultViewport,
-    //     executablePath: await chromium.executablePath(
-    //         process.env.AWS_EXECUTION_ENV
-    //             ? '/opt/nodejs/node_modules/@sparticuz/chromium/bin'
-    //             : undefined,
-    //     ),
-    //     headless: chromium.headless,
-    //     ignoreHTTPSErrors: true,
-    // });
+    const browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(
+            process.env.AWS_EXECUTION_ENV
+                ? '/opt/nodejs/node_modules/@sparticuz/chromium/bin'
+                : undefined,
+        ),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+    });
 
     const promises = []
     for (const [siteName, siteData] of Object.entries(sites)) {
@@ -19,7 +18,7 @@ export async function checkAvailability(sites) {
     }
     const resolvedPromises = await Promise.all(promises)
 
-    // await browser.close()
+    await browser.close()
     return resolvedPromises
 }
 
@@ -90,13 +89,17 @@ async function checkFotoplus(url) {
 }
 
 async function checkMediamarkt(url, browser) {
-    // const page = browser.newPage()
-    // await page.goto(url)
-    // const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
-    // const available = !!availabilityElement
+    try {
+        const page = await browser.newPage()
+        await page.goto(url)
+        const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
+        const available = !!availabilityElement
 
-    // page.close()
-    // return available
-    return false
+        page.close()
+        return available
+    } catch (err) {
+        console.log("Error while checking mediamarkt availability: " + err)
+        return false
+    }
 }
 
