@@ -1,31 +1,41 @@
-const canonSiteRegex = "chakra-text css-19qxpy"
-
 export async function checkAvailability(sites) {
+    const browser = undefined
+    // const browser = await puppeteer.launch({
+    //     args: chromium.args,
+    //     defaultViewport: chromium.defaultViewport,
+    //     executablePath: await chromium.executablePath(
+    //         process.env.AWS_EXECUTION_ENV
+    //             ? '/opt/nodejs/node_modules/@sparticuz/chromium/bin'
+    //             : undefined,
+    //     ),
+    //     headless: chromium.headless,
+    //     ignoreHTTPSErrors: true,
+    // });
+
     const promises = []
     for (const [siteName, siteData] of Object.entries(sites)) {
       const siteUrl = siteData['url']
-      promises.push(checkSite(siteName, siteUrl))
+      promises.push(checkSite(siteName, siteUrl, browser))
     }
     const resolvedPromises = await Promise.all(promises)
 
+    // await browser.close()
     return resolvedPromises
 }
 
-async function checkSite(siteName, siteUrl) {
+async function checkSite(siteName, siteUrl, browser) {
     console.log(`Checking ${siteName} availability`)
     let available = false
     try {
-        const response = await fetch(siteUrl)
-        if (!response.ok) {
-            throw new Error(`Invalid response status for ${siteName}: ${response.status}`)
-        }
-        const data = await response.text()
         switch (siteName) {
           case 'canon': 
-              available = checkCanon(data)
+              available = await checkCanon(siteUrl)
               break
           case 'fotoplus':
-              available = checkFotoplus(data)
+              available = await checkFotoplus(siteUrl)
+              break
+          case 'mediamarkt':
+              available = await checkMediamarkt(siteUrl, browser)
               break
           default:
               break
@@ -39,11 +49,22 @@ async function checkSite(siteName, siteUrl) {
     return {"siteName": siteName, "available": available}
 }
 
-function checkCanon(data) {
-    return !data.includes(canonSiteRegex)
+async function checkCanon(url) {
+    const response = await fetch(url)
+    if (!response.ok) {
+        throw new Error(`Invalid response status for canon: ${response.status}`)
+    }
+    const data = await response.text()
+    return !data.includes("chakra-text css-19qxpy")
 }
 
-function checkFotoplus(data) {
+async function checkFotoplus(url) {
+    const response = await fetch(url)
+    if (!response.ok) {
+        throw new Error(`Invalid response status for fotoplus: ${response.status}`)
+    }
+    const data = await response.text()
+
     const checkFotoplusInner = function(data, keyword) {
         const str = data.substring(data.indexOf(keyword))
         const startIndex = str.indexOf("data-title")
@@ -52,8 +73,20 @@ function checkFotoplus(data) {
 
         return roi.includes('dostępny')
     }
+
     return checkFotoplusInner(data, 'SKLEP INTERNETOWY') ||
         checkFotoplusInner(data, 'KRAKÓW') || 
         checkFotoplusInner(data, 'KATOWICE')
+}
+
+async function checkMediamarkt(url, browser) {
+    // const page = browser.newPage()
+    // await page.goto(url)
+    // const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
+    // const available = !!availabilityElement
+
+    // page.close()
+    // return available
+    return false
 }
 

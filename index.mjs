@@ -16,7 +16,11 @@ const sites = {
     "fotoplus": {
         "id": "2",
         "url": "https://fotoplus.pl/canon-powershot-g7-x-mark-iii?w=11329&srsltid=AfmBOoq8ZbOrPRDiUonIV1wP_LJdEufND2eCIOMsTF2Az-3mbBn573rBxDo",
-    }
+    },
+    "mediamarkt": {
+        "id": "3",
+        "url": "https://mediamarkt.pl/pl/product/_aparat-canon-powershot-g7-x-mark-iii-czarny-1416782.html?srsltid=AfmBOopTAOonXReSXkPzzM6ioBL0Eo1tjlo141A7bl52xNHLLd7FUWAy",
+    },
 }
 
 const minSmsIntervalHours = 12 
@@ -91,7 +95,9 @@ export const handler = async (_) => {
 
     const responses = data.Responses.AvailabilityTimestamp
     for (let response of responses) {
-      lastSentSmsMessages[response['ID']['N']] = response['Timestamp']['S']
+      const lastSentDate = response['Timestamp']['S'] ?
+      new Date(response['Timestamp']['S']) : new Date(0)
+      lastSentSmsMessages[response['ID']['N']] = lastSentDate
     }
   } catch (err) {
     console.error("DynamoDB error:", err);
@@ -101,10 +107,20 @@ export const handler = async (_) => {
     };
   }
 
+  // populate missing data for new rows
+  for (let [_siteName, siteData] of Object.entries(sites)) {
+      const siteId = siteData['id']
+      if (!(siteId in lastSentSmsMessages)) {
+          lastSentSmsMessages[siteId] = new Date(0)
+      }
+  }
+
+  console.log(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
+
   const putRequests = []
   const smsUrls = []
   const now = new Date();
-  for (let [siteId, lastSent] of Object.entries(lastSentSmsMessages)) {
+  for (let [siteId, lastSentDate] of Object.entries(lastSentSmsMessages)) {
       let siteName = ''
       for (let name of Object.keys(sites)) {
           if (sites[name]['id'] == siteId) {
@@ -123,10 +139,9 @@ export const handler = async (_) => {
           console.log(`No product available for ${siteName}`)
           continue
       }
-      const lastSentDate = lastSent ? new Date(lastSent) : new Date(0)
       const timeDiff = now.getTime() - lastSentDate.getTime()
 
-      console.log(`${siteName} is available, last SMS was sent on ${lastSentDate} (${timeDiff / 1000 / 60 / 60} hours ago)`)
+      console.log(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
       if (siteAvailability["available"]) {
           if (timeDiff < minSmsIntervalMs) {
               console.log(`Skipping SMS for ${siteName}`)
