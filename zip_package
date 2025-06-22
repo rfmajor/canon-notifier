@@ -1,7 +1,9 @@
 #!/bin/sh
 
 FILE=deploy.zip
+DIR=$(dirname "$0")
 
-zip --quiet -r "$FILE" ./*.mjs node_modules package.json package-lock.json
+rm "$DIR"/"$FILE"
+zip --quiet -r "$DIR"/"$FILE" "$DIR"/*.mjs "$DIR"/node_modules "$DIR"/package.json "$DIR"/package-lock.json
 printf "File size: %s\n" "$(du -h $FILE | cut -f 1 | xargs)"
 
