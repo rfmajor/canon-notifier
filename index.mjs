@@ -3,6 +3,7 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
 import cron from 'node-cron';
+import winston from 'winston';
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
@@ -26,12 +27,14 @@ const sites = {
 
 const minSmsIntervalHours = 12 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
+const logger = winston.createLogger({
+  transports: [new winston.transports.Console()],
+});
 
-export const handler = async (_) => {
-  let twilioApiKey;
-  let accountSid;
-  console.log("Retrieving twilio API key and accountSid")
-  try {
+logger.info("Retrieving twilio API key and accountSid")
+let twilioApiKey;
+let accountSid;
+try {
     const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
     const secretResponse = await secretsClient.send(secretCommand);
 
@@ -40,25 +43,26 @@ export const handler = async (_) => {
     accountSid = parsedSecret["shopping-api-sid"];
     if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
   } catch (err) {
-    console.error("Error retrieving twilio secret:", err);
+    logger.error("Error retrieving twilio secret:", err);
     return {
       statusCode: 500,
       body: "Error retrieving twilio secret"
     };
-  }
+}
 
+export const handler = async (_) => {
   let availability
   try {
     availability = await checkAvailability(sites)
   } catch (err) {
-    console.error("Error fetching data:", err);
+    logger.error("Error fetching data:", err);
     return {
       statusCode: 500,
       body: "Error fetching data"
     };
   }
 
-  console.log(availability)
+  logger.info(availability)
   let anyAvailable = false
   for (let a of availability) {
     if (a["available"]) {
@@ -68,7 +72,7 @@ export const handler = async (_) => {
   }
 
   if (!anyAvailable) {
-      console.log("No products available, skipping")
+      logger.info("No products available, skipping")
       return {
           statusCode: 200,
           body: JSON.stringify('Lambda finished successfully'),
@@ -88,7 +92,7 @@ export const handler = async (_) => {
     }
   };
 
-  console.log("Retrieving last sent timestamps of the SMS")
+  logger.info("Retrieving last sent timestamps of the SMS")
   const lastSentSmsMessages = {};
   try {
     const getItemCommand = new BatchGetItemCommand(readParams)
@@ -101,7 +105,7 @@ export const handler = async (_) => {
       lastSentSmsMessages[response['ID']['N']] = lastSentDate
     }
   } catch (err) {
-    console.error("DynamoDB error:", err);
+    logger.error("DynamoDB error:", err);
     return {
       statusCode: 500,
       body: "Internal Server Error"
@@ -116,7 +120,7 @@ export const handler = async (_) => {
       }
   }
 
-  console.log(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
+  logger.info(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
 
   const putRequests = []
   const smsUrls = []
@@ -137,15 +141,15 @@ export const handler = async (_) => {
           }
       }
       if (!siteAvailability["available"]) {
-          console.log(`No product available for ${siteName}`)
+          logger.info(`No product available for ${siteName}`)
           continue
       }
       const timeDiff = now.getTime() - lastSentDate.getTime()
 
-      console.log(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
+      logger.info(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
       if (siteAvailability["available"]) {
           if (timeDiff < minSmsIntervalMs) {
-              console.log(`Skipping SMS for ${siteName}`)
+              logger.info(`Skipping SMS for ${siteName}`)
           } else {
               putRequests.push({
                   PutRequest: {
@@ -161,14 +165,14 @@ export const handler = async (_) => {
   }
 
   if (smsUrls.length == 0) {
-      console.log("No SMS messages to be sent")
+      logger.info("No SMS messages to be sent")
       return {
           statusCode: 200,
           body: JSON.stringify('Lambda finished successfully'),
       };
   }
 
-  console.log("Proceeding with sending SMS")
+  logger.info("Proceeding with sending SMS")
   const writeParams = {
     RequestItems: {
         AvailabilityTimestamp: putRequests
@@ -177,10 +181,10 @@ export const handler = async (_) => {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    console.log("Overwriting the timestamp row")
+    logger.info("Overwriting the timestamp row")
     await dbClient.send(command);
   } catch (err) {
-    console.error("Error updating DynamoDB:", err);
+    logger.error("Error updating DynamoDB:", err);
     return {
       statusCode: 500,
       body: "Error updating DynamoDB"
@@ -190,7 +194,7 @@ export const handler = async (_) => {
   try {
     await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
   } catch (err) {
-    console.error("Error sending SMS:", err);
+    logger.error("Error sending SMS:", err);
     return {
       statusCode: 500,
       body: "Error sending SMS"
