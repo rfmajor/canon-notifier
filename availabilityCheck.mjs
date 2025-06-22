@@ -1,3 +1,5 @@
+import puppeteer from 'puppeteer'
+
 export async function checkAvailability(sites) {
     const browser = await puppeteer.launch({
         args: chromium.args,
