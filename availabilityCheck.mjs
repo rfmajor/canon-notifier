@@ -92,9 +92,6 @@ async function checkMediamarkt(url, browser) {
         const price = await page.$("[data-test='mms-product-price']")
 
         if (!price) {
-            await page.screenshot({
-                path: `screenshots/mediamarkt/${new Date().toISOString()}.png`
-            })
             throw Error("No content loaded, it might be blocked by captcha")
         }
         const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
