@@ -31,6 +31,10 @@ const sites = {
         "id": "5",
         "url": "https://fotoforma.pl/aparat-canon-powershot-g7-x-mark-iii-czarny?srsltid=AfmBOorl2mOiibRiayJy4Q-ogRu3rE5Mu_cxMq4roi7-qLRbsN-Vynrw",
     },
+    "fotopoker": {
+        "id": "6",
+        "url": "https://fotopoker.pl/aparat-canon-powershot-g7x-mark-iii-srebrny.html?srsltid=AfmBOoonA9IAMbhgpY8di8nPXPhq802DaHGedVkQiY6WzmfY3QgO9COy",
+    },
 }
 
 const minSmsIntervalHours = 12 

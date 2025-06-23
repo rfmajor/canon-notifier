@@ -38,6 +38,9 @@ async function checkSite(siteName, siteUrl, browser) {
           case 'fotoforma':
               available = await checkFotoforma(siteUrl, browser)
               break
+          case 'fotopoker':
+              available = await checkFotopoker(siteUrl, browser)
+              break
           default:
               break
         }
@@ -144,11 +147,34 @@ async function checkFotoforma(url, browser) {
         
         const availabilityInfo = await page.$(".availability__availability .second")
         if (!availabilityInfo) {
-            throw Error("No content loaded for cyfrowe, it might be blocked by captcha")
+            throw Error("No content loaded for fotopoker, it might be blocked by captcha")
         }
 
         const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
         const available = !innerText.includes("niedostępny")
+
+        page.close()
+        return available
+    } catch (err) {
+        logger.error("Error while checking fotoforma availability: " + err)
+        return false
+    }
+}
+
+async function checkFotopoker(url, browser) {
+    try {
+        const page = await browser.newPage()
+        await randomizeUserAgent(page)
+
+        await page.goto(url)
+        
+        const availabilityInfo = await page.$("#st_availability_info")
+        if (!availabilityInfo) {
+            throw Error("No content loaded for fotopoker, it might be blocked by captcha")
+        }
+
+        const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
+        const available = !innerText.includes("Zapytaj")
 
         page.close()
         return available
