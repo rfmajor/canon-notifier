@@ -23,6 +23,10 @@ const sites = {
         "id": "3",
         "url": "https://mediamarkt.pl/pl/product/_aparat-canon-powershot-g7-x-mark-iii-czarny-1416782.html?srsltid=AfmBOopTAOonXReSXkPzzM6ioBL0Eo1tjlo141A7bl52xNHLLd7FUWAy",
     },
+    "cyfrowe": {
+        "id": "4",
+        "url": "https://www.cyfrowe.pl/aparat-cyfrowy-canon-powershot-g7-x-mark-iii-czarny-p.html?srsltid=AfmBOoqE5L2F7leU7qt2LciybFGMYONMaGjOBKrTxQ0SkUuB78dFJxOD",
+    },
 }
 
 const minSmsIntervalHours = 12 

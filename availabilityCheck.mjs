@@ -32,6 +32,9 @@ async function checkSite(siteName, siteUrl, browser) {
           case 'mediamarkt':
               available = await checkMediamarkt(siteUrl, browser)
               break
+          case 'cyfrowe':
+              available = await checkCyfrowe(siteUrl, browser)
+              break
           default:
               break
         }
@@ -101,6 +104,24 @@ async function checkMediamarkt(url, browser) {
         return available
     } catch (err) {
         logger.error("Error while checking mediamarkt availability: " + err)
+        return false
+    }
+}
+
+async function checkCyfrowe(url, browser) {
+    try {
+        const page = await browser.newPage()
+        await randomizeUserAgent(page)
+
+        await page.goto(url)
+
+        const notifyLayer = await page.$("[data-test='mms-product-price']")
+        const available = !notifyLayer
+
+        page.close()
+        return available
+    } catch (err) {
+        logger.error("Error while checking cyfrowe availability: " + err)
         return false
     }
 }
