@@ -27,6 +27,10 @@ const sites = {
         "id": "4",
         "url": "https://www.cyfrowe.pl/aparat-cyfrowy-canon-powershot-g7-x-mark-iii-czarny-p.html?srsltid=AfmBOoqE5L2F7leU7qt2LciybFGMYONMaGjOBKrTxQ0SkUuB78dFJxOD",
     },
+    "fotoforma": {
+        "id": "5",
+        "url": "https://fotoforma.pl/aparat-canon-powershot-g7-x-mark-iii-czarny?srsltid=AfmBOorl2mOiibRiayJy4Q-ogRu3rE5Mu_cxMq4roi7-qLRbsN-Vynrw",
+    },
 }
 
 const minSmsIntervalHours = 12 
