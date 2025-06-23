@@ -89,9 +89,9 @@ async function checkMediamarkt(url, browser) {
         await randomizeUserAgent(page)
 
         await page.goto(url)
-        const content = await page.$("[data-test='mms-pdp-gallery']")
+        const price = await page.$("[data-test='mms-product-price']")
 
-        if (!content) {
+        if (!price) {
             await page.screenshot({
                 path: `screenshots/mediamarkt/${new Date().toISOString()}.png`
             })
