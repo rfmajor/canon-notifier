@@ -95,7 +95,7 @@ async function checkMediamarkt(url, browser) {
         const price = await page.$("[data-test='mms-product-price']")
 
         if (!price) {
-            throw Error("No content loaded, it might be blocked by captcha")
+            throw Error("No content loaded for mediamarkt, it might be blocked by captcha")
         }
         const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
         const available = !!availabilityElement
@@ -114,8 +114,14 @@ async function checkCyfrowe(url, browser) {
         await randomizeUserAgent(page)
 
         await page.goto(url)
+        
+        const cardOffer = await page.$(".product-card__offer")
 
-        const notifyLayer = await page.$("[data-test='mms-product-price']")
+        if (!cardOffer) {
+            throw Error("No content loaded for cyfrowe, it might be blocked by captcha")
+        }
+
+        const notifyLayer = await page.$("[data-addclass='notify-layer']")
         const available = !notifyLayer
 
         page.close()
