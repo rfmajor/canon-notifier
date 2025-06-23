@@ -1,4 +1,7 @@
-import puppeteer from 'puppeteer'
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+puppeteer.use(StealthPlugin())
 
 export async function checkAvailability(sites) {
     const browser = await puppeteer.launch();
@@ -83,10 +86,15 @@ async function checkFotoplus(url) {
 async function checkMediamarkt(url, browser) {
     try {
         const page = await browser.newPage()
+        await randomizeUserAgent(page)
+
         await page.goto(url)
         const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
         const available = !!availabilityElement
 
+        await page.screenshot({
+            path: "mediamarkt.png"
+        })
         page.close()
         return available
     } catch (err) {
@@ -95,3 +103,15 @@ async function checkMediamarkt(url, browser) {
     }
 }
 
+async function randomizeUserAgent(page) {
+    // Set a realistic user-agent to match the IP’s region and browser version
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+    );
+
+    // Randomize viewport slightly to avoid fingerprinting from consistent dimensions
+    await page.setViewport({
+      width: Math.floor(1024 + Math.random() * 100),
+      height: Math.floor(768 + Math.random() * 100),
+    });
+}
