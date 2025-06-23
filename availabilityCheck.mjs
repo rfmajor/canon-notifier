@@ -89,12 +89,17 @@ async function checkMediamarkt(url, browser) {
         await randomizeUserAgent(page)
 
         await page.goto(url)
+        const content = await page.$("[data-test='mms-pdp-gallery']")
+
+        if (!content) {
+            await page.screenshot({
+                path: `screenshots/mediamarkt/${new Date().toISOString()}.png`
+            })
+            throw Error("No content loaded, it might be blocked by captcha")
+        }
         const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
         const available = !!availabilityElement
 
-        await page.screenshot({
-            path: "mediamarkt.png"
-        })
         page.close()
         return available
     } catch (err) {
