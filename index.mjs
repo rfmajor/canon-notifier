@@ -3,7 +3,7 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
 import cron from 'node-cron';
-import winston from 'winston';
+import logger from './logger.mjs';
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
@@ -27,9 +27,6 @@ const sites = {
 
 const minSmsIntervalHours = 12 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
-const logger = winston.createLogger({
-  transports: [new winston.transports.Console()],
-});
 
 logger.info("Retrieving twilio API key and accountSid")
 let twilioApiKey;

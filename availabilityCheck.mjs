@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import logger from './logger.mjs'
 
 puppeteer.use(StealthPlugin())
 
@@ -18,7 +19,7 @@ export async function checkAvailability(sites) {
 }
 
 async function checkSite(siteName, siteUrl, browser) {
-    console.log(`Checking ${siteName} availability`)
+    logger.info(`Checking ${siteName} availability`)
     let available = false
     try {
         switch (siteName) {
@@ -35,11 +36,10 @@ async function checkSite(siteName, siteUrl, browser) {
               break
         }
     } catch (error) {
-        console.error(error.message)
+        logger.error(error.message)
         available = false
     }
 
-    console.log(`Availability on ${siteName}: ${available}`)
     return {"siteName": siteName, "available": available}
 }
 
@@ -52,7 +52,7 @@ async function checkCanon(url) {
         const data = await response.text()
         return !data.includes("chakra-text css-19qxpy")
     } catch (err) {
-        console.log("Error while checking canon availability: " + err)
+        logger.error("Error while checking canon availability: " + err)
         return false
     }
 }
@@ -78,7 +78,7 @@ async function checkFotoplus(url) {
             checkFotoplusInner(data, 'KRAKÓW') || 
             checkFotoplusInner(data, 'KATOWICE')
     } catch (err) {
-        console.log("Error while checking fotoplus availability: " + err)
+        logger.error("Error while checking fotoplus availability: " + err)
         return false
     }
 }
@@ -103,7 +103,7 @@ async function checkMediamarkt(url, browser) {
         page.close()
         return available
     } catch (err) {
-        console.log("Error while checking mediamarkt availability: " + err)
+        logger.error("Error while checking mediamarkt availability: " + err)
         return false
     }
 }
