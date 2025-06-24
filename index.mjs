@@ -16,9 +16,10 @@ const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
 const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
 
-const [twilioApiKey, accountSid] = await getTwilioKeys()
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
+
+const [twilioApiKey, accountSid] = await getTwilioKeys()
 
 async function runJob() {
   let availability
