@@ -82,15 +82,15 @@ const handlers = {
         }
     },
     "xkom": {
-        "headless": false,
-        "contentCheck": (data) => {
-            return data.includes('data-name="productTitle"')
+        "headless": true,
+        "contentCheck": async (page) => {
+            const productTitle = await page.$('[data-name="productTitle"]')
+            return !!productTitle
         },
-        "availabilityCheck": (data) => {
-            const startIndex = data.indexOf('data-name="buybox"')
-            const endIndex = data.indexOf('id="anchor_navbar"')
-            const availabilityDivSubstring = data.substring(startIndex, endIndex)
-            return !availabilityDivSubstring.includes("niedostępny")
+        "availabilityCheck": async (page) => {
+            const buyBox = await page.$('[data-name="buybox"]')
+            const innerText = await page.evaluate(el => el.innerText, buyBox);
+            return !innerText.includes("niedostępny")
         }
     },
 }
