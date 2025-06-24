@@ -5,7 +5,8 @@ import withTimeout from './timeout.mjs'
 
 puppeteer.use(StealthPlugin())
 
-const TIMEOUT_MS = 10000
+const PAGE_TIMEOUT_MS = 15000
+const FUNCTION_TIMEOUT_MS = 20000
 
 const handlers = {
     "canon": {
@@ -138,7 +139,7 @@ async function checkNormal(siteName, url, contentCheck, availabilityCheck) {
                 throw new Error(`No content loaded for ${siteName}, you might need to use a headless browser`)
             }
             return availabilityCheck(data)
-        }, TIMEOUT_MS)
+        }, FUNCTION_TIMEOUT_MS)
     } catch (err) {
         logger.error(`Error while checking ${siteName} availability: ${err}`)
         return false
@@ -151,14 +152,17 @@ async function checkHeadless(siteName, url, contentCheck, availabilityCheck, bro
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
-            await page.goto(url)
+            await page.goto(url, {
+                waitUntil: "networkidle2",
+                timeout: PAGE_TIMEOUT_MS
+            })
 
             if (!(await contentCheck(page))) {
                 throw Error(`No content loaded for ${siteName}, it might be blocked by captcha`)
             }
 
             return await availabilityCheck(page)
-        }, TIMEOUT_MS)
+        }, FUNCTION_TIMEOUT_MS)
     } catch (err) {
         logger.error(`Error while checking ${siteName} availability: ${err}`)
         return false
