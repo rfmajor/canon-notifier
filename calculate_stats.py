@@ -18,7 +18,6 @@ def main():
             row = json.loads(line)
             for availability in row["availability"]:
                 site_name = availability["siteName"]
-                invocations[site_name] += 1
                 if site_name not in errors:
                     errors[site_name] = 0
                 if site_name not in successes:
@@ -28,6 +27,7 @@ def main():
                 if site_name not in invocations:
                     invocations[site_name] = 0
 
+                invocations[site_name] += 1
                 if availability["error"]:
                     errors[site_name] += 1
                     continue
