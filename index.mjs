@@ -2,7 +2,7 @@ import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
-import { logger, writeAvailabilityStats } from './logger.mjs';
+import logger, { writeAvailabilityStats } from './logger.mjs';
 import withTimeout from './timeout.mjs'
 import cron from 'node-cron';
 import { readFileSync } from 'fs'
