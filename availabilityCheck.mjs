@@ -196,7 +196,7 @@ async function checkFotopoker(url, browser) {
             return available
         }, TIMEOUT_MS)
     } catch (err) {
-        logger.error("Error while checking fotoforma availability: " + err)
+        logger.error("Error while checking fotopoker availability: " + err)
         return false
     } finally {
         await page.close()
