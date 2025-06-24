@@ -15,7 +15,7 @@ const handlers = {
     "fotoplus": {
         "headless": false,
         "availabilityCheck": (data) => {
-            for (keyword of ['SKLEP INTERNETOWY', 'KRAKÓW', 'KATOWICE']) {
+            for (const keyword of ['SKLEP INTERNETOWY', 'KRAKÓW', 'KATOWICE']) {
                 const str = data.substring(data.indexOf(keyword))
                 const startIndex = str.indexOf("data-title")
                 const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
@@ -135,11 +135,11 @@ async function checkHeadless(siteName, url, captchaCheck, availabilityCheck, bro
 
             await page.goto(url)
 
-            if (!captchaCheck(page)) {
+            if (!(await captchaCheck(page))) {
                 throw Error(`No content loaded for ${siteName}, it might be blocked by captcha`)
             }
 
-            return availabilityCheck(page)
+            return await availabilityCheck(page)
         }, TIMEOUT_MS)
     } catch (err) {
         logger.error(`Error while checking ${siteName} availability: ${err}`)
