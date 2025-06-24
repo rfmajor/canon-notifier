@@ -10,10 +10,16 @@ const TIMEOUT_MS = 10000
 const handlers = {
     "canon": {
         "headless": false,
+        "contentCheck": (data) => {
+            return data.includes('sf-product-detail-page')
+        },
         "availabilityCheck": (data) => !data.includes("chakra-text css-19qxpy"),
     },
     "fotoplus": {
         "headless": false,
+        "contentCheck": (data) => {
+            return data.includes('SKLEP INTERNETOWY')
+        },
         "availabilityCheck": (data) => {
             for (const keyword of ['SKLEP INTERNETOWY', 'KRAKÓW', 'KATOWICE']) {
                 const str = data.substring(data.indexOf(keyword))
@@ -30,7 +36,7 @@ const handlers = {
     },
     "mediamarkt": {
         "headless": true,
-        "captchaCheck": async (page) => {
+        "contentCheck": async (page) => {
             const price = await page.$("[data-test='mms-product-price']")
             return !!price
         },
@@ -41,7 +47,7 @@ const handlers = {
     },
     "cyfrowe": {
         "headless": true,
-        "captchaCheck": async (page) => {
+        "contentCheck": async (page) => {
             const cardOffer = await page.$(".product-card__offer")
             return !!cardOffer
         },
@@ -52,6 +58,9 @@ const handlers = {
     },
     "fotoforma": {
         "headless": false,
+        "contentCheck": (data) => {
+            return data.includes('availability__availability')
+        },
         "availabilityCheck": (data) => {
             const startIndex = data.indexOf("availability__availability")
             const endIndex = data.indexOf("availability__file")
@@ -61,6 +70,9 @@ const handlers = {
     },
     "fotopoker": {
         "headless": false,
+        "contentCheck": (data) => {
+            return data.includes('st_availability_info-value')
+        },
         "availabilityCheck": (data) => {
             const startIndex = data.indexOf("st_availability_info-value")
             const endIndex = data.indexOf("<\/span>")
@@ -71,17 +83,26 @@ const handlers = {
 }
 
 export async function checkAvailability(sites) {
-    const browser = await puppeteer.launch();
+    let browser
+    try {
+        browser = await puppeteer.launch();
 
-    const promises = []
-    for (const [siteName, siteData] of Object.entries(sites)) {
-      const siteUrl = siteData['url']
-      promises.push(checkSite(siteName, siteUrl, browser))
+        const promises = []
+        for (const [siteName, siteData] of Object.entries(sites)) {
+          const siteUrl = siteData['url']
+          promises.push(checkSite(siteName, siteUrl, browser))
+        }
+        const resolvedPromises = await Promise.all(promises)
+
+        return resolvedPromises
+    } catch (err) {
+        logger.error("Checking availabilities failed: " + err)
+        return null
+    } finally {
+        if (browser) {
+            await browser.close()
+        }
     }
-    const resolvedPromises = await Promise.all(promises)
-
-    await browser.close()
-    return resolvedPromises
 }
 
 async function checkSite(siteName, siteUrl, browser) {
@@ -93,9 +114,9 @@ async function checkSite(siteName, siteUrl, browser) {
         }
         const handler = handlers[siteName]
         if (!handler['headless']) {
-            available = await checkNormal(siteName, siteUrl, handler['availabilityCheck'])
+            available = await checkNormal(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'])
         } else {
-            available = await checkHeadless(siteName, siteUrl, handler['captchaCheck'], handler['availabilityCheck'], browser)
+            available = await checkHeadless(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'], browser)
         }
     } catch (error) {
         logger.error(error.message)
@@ -105,7 +126,7 @@ async function checkSite(siteName, siteUrl, browser) {
     return {"siteName": siteName, "available": available}
 }
 
-async function checkNormal(siteName, url, availabilityCheck) {
+async function checkNormal(siteName, url, contentCheck, availabilityCheck) {
     try {
         return await withTimeout(async () => {
             const response = await fetch(url)
@@ -113,6 +134,9 @@ async function checkNormal(siteName, url, availabilityCheck) {
                 throw new Error(`Invalid response status for ${siteName}: ${response.status}`)
             }
             const data = await response.text()
+            if (!contentCheck(data)) {
+                throw new Error(`No content loaded for ${siteName}, you might need to use a headless browser`)
+            }
             return availabilityCheck(data)
         }, TIMEOUT_MS)
     } catch (err) {
@@ -121,7 +145,7 @@ async function checkNormal(siteName, url, availabilityCheck) {
     }
 }
 
-async function checkHeadless(siteName, url, captchaCheck, availabilityCheck, browser) {
+async function checkHeadless(siteName, url, contentCheck, availabilityCheck, browser) {
     const page = await browser.newPage()
     try {
         return await withTimeout(async () => {
@@ -129,7 +153,7 @@ async function checkHeadless(siteName, url, captchaCheck, availabilityCheck, bro
 
             await page.goto(url)
 
-            if (!(await captchaCheck(page))) {
+            if (!(await contentCheck(page))) {
                 throw Error(`No content loaded for ${siteName}, it might be blocked by captcha`)
             }
 
