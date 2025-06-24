@@ -12,7 +12,7 @@ export function writeAvailabilityStats(availability, outputFile) {
     const data = JSON.stringify({
         "timestamp": new Date().toISOString(),
         "availability": availability
-    })
+    } + "\n")
 
     fs.appendFile(outputFile, data, 'utf8', (err) => {
         if (err) {
