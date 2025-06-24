@@ -7,7 +7,8 @@ def main():
         raise Exception("No filename provided")
 
     filename = sys.argv[1]
-    invocations = 0
+    all_invocations = 0
+    invocations = {}
     successes = {}
     errors = {}
     availables = {}
@@ -17,21 +18,24 @@ def main():
             row = json.loads(line)
             for availability in row["availability"]:
                 site_name = availability["siteName"]
+                invocations[site_name] += 1
                 if site_name not in errors:
                     errors[site_name] = 0
                 if site_name not in successes:
                     successes[site_name] = 0
                 if site_name not in availables:
                     availables[site_name] = 0
+                if site_name not in invocations:
+                    invocations[site_name] = 0
 
                 if availability["error"]:
                     errors[site_name] += 1
                     continue
                 successes[site_name] += 1
                 availables[site_name] += 1 if availability["available"] else 0
-            invocations += 1
-    stats = {"invocations": invocations, "successes": successes,
-            "errors": errors, "availables": availables}
+            all_invocations += 1
+    stats = {"allInvocations": all_invocations, "invocations": invocations,
+             "successes": successes, "errors": errors, "availables": availables}
 
     pprint.pprint(stats)
 
