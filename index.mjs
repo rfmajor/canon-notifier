@@ -2,13 +2,15 @@ import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
-import cron from 'node-cron';
 import logger from './logger.mjs';
+import { withTimeout } from './timeout.mjs'
+import cron from 'node-cron';
 
 const region = "eu-north-1";
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
+const TIMEOUT_MS = 55000;
 
 const sites = {
     "canon": {
@@ -211,4 +213,5 @@ export const handler = async (_) => {
   };
 };
 
-cron.schedule('* * * * *', async () => await handler({}));
+cron.schedule('* * * * *', async () => await withTimeout((async () => await handler({})), TIMEOUT_MS));
+
