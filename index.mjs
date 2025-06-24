@@ -8,41 +8,25 @@ import cron from 'node-cron';
 import { readFileSync } from 'fs'
 
 const region = "eu-north-1";
-const dbClient = new DynamoDBClient({ region });
-const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
-const TIMEOUT_MS = 55000;
+const JOB_TIMEOUT_MS = 55000;
 
 const minSmsIntervalHours = 12 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
 const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
 
-logger.info("Retrieving twilio API key and accountSid")
-let twilioApiKey;
-let accountSid;
-try {
-    const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
-    const secretResponse = await secretsClient.send(secretCommand);
+const [twilioApiKey, accountSid] = await getTwilioKeys()
+const dbClient = new DynamoDBClient({ region });
+const secretsClient = new SecretsManagerClient({ region });
 
-    const parsedSecret = JSON.parse(secretResponse.SecretString);
-    twilioApiKey = parsedSecret["shopping-api-key"];
-    accountSid = parsedSecret["shopping-api-sid"];
-    if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
-  } catch (err) {
-    logger.error("Error retrieving twilio secret:", err);
-}
-
-export const handler = async (_) => {
+async function runJob() {
   let availability
   try {
     availability = await checkAvailability(sites)
   } catch (err) {
-    logger.error("Error fetching data:", err);
-    return {
-      statusCode: 500,
-      body: "Error fetching data"
-    };
+    logger.error("Aborting, error fetching data: ", err);
+    return
   }
 
   logger.info(availability)
@@ -56,11 +40,9 @@ export const handler = async (_) => {
 
   if (!anyAvailable) {
       logger.info("No products available, skipping")
-      return {
-          statusCode: 200,
-          body: JSON.stringify('Lambda finished successfully'),
-      };
+      return
   }
+
   const urlsIds = []
   for (let siteData of Object.values(sites)) {
     urlsIds.push({
@@ -88,11 +70,8 @@ export const handler = async (_) => {
       lastSentSmsMessages[response['ID']['N']] = lastSentDate
     }
   } catch (err) {
-    logger.error("DynamoDB error:", err);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error"
-    };
+    logger.error("Aborting because of DynamoDB error: ", err);
+    return
   }
 
   // populate missing data for new rows
@@ -149,10 +128,7 @@ export const handler = async (_) => {
 
   if (smsUrls.length == 0) {
       logger.info("No SMS messages to be sent")
-      return {
-          statusCode: 200,
-          body: JSON.stringify('Lambda finished successfully'),
-      };
+      return
   }
 
   logger.info("Proceeding with sending SMS")
@@ -164,30 +140,33 @@ export const handler = async (_) => {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    logger.info("Overwriting the timestamp row")
-    await dbClient.send(command);
-  } catch (err) {
-    logger.error("Error updating DynamoDB:", err);
-    return {
-      statusCode: 500,
-      body: "Error updating DynamoDB"
-    };
-  }
-
-  try {
     await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
   } catch (err) {
     logger.error("Error sending SMS:", err);
-    return {
-      statusCode: 500,
-      body: "Error sending SMS"
-    };
   }
-  return {
-      statusCode: 200,
-      body: JSON.stringify('Lambda finished successfully'),
-  };
+
+  try {
+    logger.info("Overwriting the timestamp row")
+    await dbClient.send(command);
+  } catch (err) {
+    logger.error("Aborting, error updating DynamoDB: ", err);
+    return
+  }
+
 };
 
-cron.schedule('* * * * *', async () => await withTimeout((async () => await handler({})), TIMEOUT_MS));
+async function getTwilioKeys() {
+    logger.info("Retrieving twilio API key and accountSid")
+    const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
+    const secretResponse = await secretsClient.send(secretCommand);
+
+    const parsedSecret = JSON.parse(secretResponse.SecretString);
+    const twilioApiKey = parsedSecret["shopping-api-key"];
+    const accountSid = parsedSecret["shopping-api-sid"];
+    if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
+
+    return [twilioApiKey, accountSid]
+}
+
+cron.schedule('* * * * *', async () => await withTimeout(runJob, JOB_TIMEOUT_MS));
 
