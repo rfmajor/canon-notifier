@@ -7,6 +7,75 @@ puppeteer.use(StealthPlugin())
 
 const TIMEOUT_MS = 10000
 
+const handlers = {
+    "canon": {
+        "headless": false,
+        "availabilityCheck": (data) => !data.includes("chakra-text css-19qxpy"),
+    },
+    "fotoplus": {
+        "headless": false,
+        "availabilityCheck": (data) => {
+            for (keyword of ['SKLEP INTERNETOWY', 'KRAKÓW', 'KATOWICE']) {
+                const str = data.substring(data.indexOf(keyword))
+                const startIndex = str.indexOf("data-title")
+                const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
+                const roi = str.substring(startIndex, endIndex)
+
+                if (roi.includes('dostępny')) {
+                    return true
+                }
+            }
+            return false
+        }
+    },
+    "mediamarkt": {
+        "headless": true,
+        "captchaCheck": async (page) => {
+            const price = await page.$("[data-test='mms-product-price']")
+            return !!price
+        },
+        "availabilityCheck": async (page) => {
+            const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
+            return !!availabilityElement
+        }
+    },
+    "cyfrowe": {
+        "headless": true,
+        "captchaCheck": async (page) => {
+            const cardOffer = await page.$(".product-card__offer")
+            return !!cardOffer
+        },
+        "availabilityCheck": async (page) => {
+            const notifyLayer = await page.$("[data-addclass='notify-layer']")
+            return !notifyLayer
+        }
+    },
+    "fotoforma": {
+        "headless": true,
+        "captchaCheck": async (page) => {
+            const availabilityInfo = await page.$(".availability__availability .second")
+            return !!availabilityInfo
+        },
+        "availabilityCheck": async (page) => {
+            const availabilityInfo = await page.$(".availability__availability .second")
+            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
+            return !innerText.includes("niedostępny")
+        }
+    },
+    "fotopoker": {
+        "headless": true,
+        "captchaCheck": async (page) => {
+            const availabilityInfo = await page.$("#st_availability_info")
+            return !!availabilityInfo
+        },
+        "availabilityCheck": async (page) => {
+            const availabilityInfo = await page.$("#st_availability_info")
+            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
+            return !innerText.includes("Zapytaj")
+        }
+    },
+}
+
 export async function checkAvailability(sites) {
     const browser = await puppeteer.launch();
 
@@ -25,27 +94,14 @@ async function checkSite(siteName, siteUrl, browser) {
     logger.info(`Checking ${siteName} availability`)
     let available = false
     try {
-        switch (siteName) {
-          case 'canon': 
-              available = await checkCanon(siteUrl)
-              break
-          case 'fotoplus':
-              available = await checkFotoplus(siteUrl)
-              break
-          case 'mediamarkt':
-              available = await checkMediamarkt(siteUrl, browser)
-              break
-          case 'cyfrowe':
-              available = await checkCyfrowe(siteUrl, browser)
-              break
-          case 'fotoforma':
-              available = await checkFotoforma(siteUrl, browser)
-              break
-          case 'fotopoker':
-              available = await checkFotopoker(siteUrl, browser)
-              break
-          default:
-              break
+        if (!(siteName in handlers)) {
+            throw Error(`No handler found for ${siteName}`)
+        }
+        const handler = handlers[siteName]
+        if (!handler['headless']) {
+            available = await checkNormal(siteName, siteUrl, handler['availabilityCheck'])
+        } else {
+            available = await checkHeadless(siteName, siteUrl, handler['captchaCheck'], handler['availabilityCheck'], browser)
         }
     } catch (error) {
         logger.error(error.message)
@@ -55,148 +111,38 @@ async function checkSite(siteName, siteUrl, browser) {
     return {"siteName": siteName, "available": available}
 }
 
-async function checkCanon(url) {
+async function checkNormal(siteName, url, availabilityCheck) {
     try {
         return await withTimeout(async () => {
             const response = await fetch(url)
             if (!response.ok) {
-                throw new Error(`Invalid response status for canon: ${response.status}`)
+                throw new Error(`Invalid response status for ${siteName}: ${response.status}`)
             }
             const data = await response.text()
-            return !data.includes("chakra-text css-19qxpy")
+            return availabilityCheck(data)
         }, TIMEOUT_MS)
     } catch (err) {
-        logger.error("Error while checking canon availability: " + err)
+        logger.error(`Error while checking ${siteName} availability: ${err}`)
         return false
     }
 }
 
-async function checkFotoplus(url) {
-    try {
-        return await withTimeout(async () => {
-            const response = await fetch(url)
-            if (!response.ok) {
-                throw new Error(`Invalid response status for fotoplus: ${response.status}`)
-            }
-            const data = await response.text()
-
-            const checkFotoplusInner = function(data, keyword) {
-                const str = data.substring(data.indexOf(keyword))
-                const startIndex = str.indexOf("data-title")
-                const endIndex = startIndex + str.substring(startIndex).indexOf("\n")
-                const roi = str.substring(startIndex, endIndex)
-
-                return roi.includes('dostępny')
-            }
-
-            return checkFotoplusInner(data, 'SKLEP INTERNETOWY') ||
-                checkFotoplusInner(data, 'KRAKÓW') || 
-                checkFotoplusInner(data, 'KATOWICE')
-        }, TIMEOUT_MS)
-    } catch (err) {
-        logger.error("Error while checking fotoplus availability: " + err)
-        return false
-    }
-}
-
-async function checkMediamarkt(url, browser) {
+async function checkHeadless(siteName, url, captchaCheck, availabilityCheck, browser) {
     const page = await browser.newPage()
     try {
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
             await page.goto(url)
-            const price = await page.$("[data-test='mms-product-price']")
 
-            if (!price) {
-                throw Error("No content loaded for mediamarkt, it might be blocked by captcha")
-            }
-            const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
-            const available = !!availabilityElement
-
-            return available
-        }, TIMEOUT_MS)
-    } catch (err) {
-        logger.error("Error while checking mediamarkt availability: " + err)
-        return false
-    } finally {
-        await page.close()
-    }
-}
-
-async function checkCyfrowe(url, browser) {
-    const page = await browser.newPage()
-    try {
-        return await withTimeout(async () => {
-            await randomizeUserAgent(page)
-
-            await page.goto(url)
-            
-            const cardOffer = await page.$(".product-card__offer")
-
-            if (!cardOffer) {
-                throw Error("No content loaded for cyfrowe, it might be blocked by captcha")
+            if (!captchaCheck(page)) {
+                throw Error(`No content loaded for ${siteName}, it might be blocked by captcha`)
             }
 
-            const notifyLayer = await page.$("[data-addclass='notify-layer']")
-            const available = !notifyLayer
-
-            return available
+            return availabilityCheck(page)
         }, TIMEOUT_MS)
     } catch (err) {
-        logger.error("Error while checking cyfrowe availability: " + err)
-        return false
-    } finally {
-        await page.close()
-    }
-}
-
-async function checkFotoforma(url, browser) {
-    const page = await browser.newPage()
-    try {
-        return await withTimeout(async () => {
-            await randomizeUserAgent(page)
-
-            await page.goto(url)
-            
-            const availabilityInfo = await page.$(".availability__availability .second")
-            if (!availabilityInfo) {
-                throw Error("No content loaded for fotopoker, it might be blocked by captcha")
-            }
-
-            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
-            const available = !innerText.includes("niedostępny")
-
-            return available
-        }, TIMEOUT_MS)
-    } catch (err) {
-        logger.error("Error while checking fotoforma availability: " + err)
-        return false
-    } finally {
-        await page.close()
-    }
-}
-
-async function checkFotopoker(url, browser) {
-    const page = await browser.newPage()
-    try {
-        return await withTimeout(async () => {
-            await randomizeUserAgent(page)
-
-            await page.goto(url)
-            
-            const availabilityInfo = await page.$("#st_availability_info")
-            if (!availabilityInfo) {
-                throw Error("No content loaded for fotopoker, it might be blocked by captcha")
-            }
-
-            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
-            const available = !innerText.includes("Zapytaj")
-
-            return available
-        }, TIMEOUT_MS)
-    } catch (err) {
-        logger.error("Error while checking fotopoker availability: " + err)
+        logger.error(`Error while checking ${siteName} availability: ${err}`)
         return false
     } finally {
         await page.close()
@@ -215,3 +161,4 @@ async function randomizeUserAgent(page) {
       height: Math.floor(768 + Math.random() * 100),
     });
 }
+
