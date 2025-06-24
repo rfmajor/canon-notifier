@@ -100,14 +100,20 @@ export async function checkAvailability(sites) {
     try {
         browser = await puppeteer.launch();
 
-        const promises = []
+        const asyncRequests = []
+        const syncRequests = []
         for (const [siteName, siteData] of Object.entries(sites)) {
           const siteUrl = siteData['url']
-          promises.push(checkSite(siteName, siteUrl, browser))
+          groupRequestByType(siteName, siteUrl, browser, asyncRequests, syncRequests)
         }
-        const resolvedPromises = await Promise.all(promises)
+        const availability = await Promise.all(asyncRequests)
 
-        return resolvedPromises
+        // execute sync requests sequentially
+        for (const request of syncRequests) {
+            availability.push(await request())
+        }
+
+        return availability
     } catch (err) {
         logger.error("Checking availabilities failed: " + err)
         return {}
@@ -115,6 +121,19 @@ export async function checkAvailability(sites) {
         if (browser) {
             await browser.close()
         }
+    }
+}
+
+function groupRequestByType(siteName, siteUrl, browser, asyncRequests, syncRequests) {
+    const handler = handlers[siteName]
+    if (!handler) {
+        logging.error(`Skipping ${siteName}, no handler found`)
+        return
+    }
+    if (handler["headless"]) {
+        syncRequests.push(async () => await checkSite(siteName, siteUrl, browser))
+    } else {
+        asyncRequests.push(checkSite(siteName, siteUrl, browser))
     }
 }
 
