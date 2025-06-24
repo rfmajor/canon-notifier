@@ -101,8 +101,8 @@ async function checkFotoplus(url) {
 
 async function checkMediamarkt(url, browser) {
     try {
+        const page = await browser.newPage()
         return await withTimeout(async () => {
-            const page = await browser.newPage()
             await randomizeUserAgent(page)
 
             await page.goto(url)
@@ -114,19 +114,20 @@ async function checkMediamarkt(url, browser) {
             const availabilityElement = await page.$("[data-test='mms-cofr-delivery_AVAILABLE']")
             const available = !!availabilityElement
 
-            page.close()
             return available
         }, TIMEOUT_MS)
     } catch (err) {
         logger.error("Error while checking mediamarkt availability: " + err)
         return false
+    } finally {
+        await page.close()
     }
 }
 
 async function checkCyfrowe(url, browser) {
     try {
+        const page = await browser.newPage()
         return await withTimeout(async () => {
-            const page = await browser.newPage()
             await randomizeUserAgent(page)
 
             await page.goto(url)
@@ -140,19 +141,20 @@ async function checkCyfrowe(url, browser) {
             const notifyLayer = await page.$("[data-addclass='notify-layer']")
             const available = !notifyLayer
 
-            page.close()
             return available
         }, TIMEOUT_MS)
     } catch (err) {
         logger.error("Error while checking cyfrowe availability: " + err)
         return false
+    } finally {
+        await page.close()
     }
 }
 
 async function checkFotoforma(url, browser) {
     try {
+        const page = await browser.newPage()
         return await withTimeout(async () => {
-            const page = await browser.newPage()
             await randomizeUserAgent(page)
 
             await page.goto(url)
@@ -165,19 +167,20 @@ async function checkFotoforma(url, browser) {
             const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
             const available = !innerText.includes("niedostępny")
 
-            page.close()
             return available
         }, TIMEOUT_MS)
     } catch (err) {
         logger.error("Error while checking fotoforma availability: " + err)
         return false
+    } finally {
+        await page.close()
     }
 }
 
 async function checkFotopoker(url, browser) {
     try {
+        const page = await browser.newPage()
         return await withTimeout(async () => {
-            const page = await browser.newPage()
             await randomizeUserAgent(page)
 
             await page.goto(url)
@@ -190,12 +193,13 @@ async function checkFotopoker(url, browser) {
             const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
             const available = !innerText.includes("Zapytaj")
 
-            page.close()
             return available
         }, TIMEOUT_MS)
     } catch (err) {
         logger.error("Error while checking fotoforma availability: " + err)
         return false
+    } finally {
+        await page.close()
     }
 }
 
