@@ -100,8 +100,8 @@ async function checkFotoplus(url) {
 }
 
 async function checkMediamarkt(url, browser) {
+    const page = await browser.newPage()
     try {
-        const page = await browser.newPage()
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
@@ -125,8 +125,8 @@ async function checkMediamarkt(url, browser) {
 }
 
 async function checkCyfrowe(url, browser) {
+    const page = await browser.newPage()
     try {
-        const page = await browser.newPage()
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
@@ -152,8 +152,8 @@ async function checkCyfrowe(url, browser) {
 }
 
 async function checkFotoforma(url, browser) {
+    const page = await browser.newPage()
     try {
-        const page = await browser.newPage()
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
@@ -178,8 +178,8 @@ async function checkFotoforma(url, browser) {
 }
 
 async function checkFotopoker(url, browser) {
+    const page = await browser.newPage()
     try {
-        const page = await browser.newPage()
         return await withTimeout(async () => {
             await randomizeUserAgent(page)
 
