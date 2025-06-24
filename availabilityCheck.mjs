@@ -51,27 +51,21 @@ const handlers = {
         }
     },
     "fotoforma": {
-        "headless": true,
-        "captchaCheck": async (page) => {
-            const availabilityInfo = await page.$(".availability__availability .second")
-            return !!availabilityInfo
-        },
-        "availabilityCheck": async (page) => {
-            const availabilityInfo = await page.$(".availability__availability .second")
-            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
-            return !innerText.includes("niedostępny")
+        "headless": false,
+        "availabilityCheck": (data) => {
+            const startIndex = data.indexOf("availability__availability")
+            const endIndex = data.indexOf("availability__file")
+            const availabilityDivSubstring = data.substring(startIndex, endIndex)
+            return !availabilityDivSubstring.includes("niedostępny")
         }
     },
     "fotopoker": {
-        "headless": true,
-        "captchaCheck": async (page) => {
-            const availabilityInfo = await page.$("#st_availability_info")
-            return !!availabilityInfo
-        },
-        "availabilityCheck": async (page) => {
-            const availabilityInfo = await page.$("#st_availability_info")
-            const innerText = await page.evaluate(el => el.innerText, availabilityInfo);
-            return !innerText.includes("Zapytaj")
+        "headless": false,
+        "availabilityCheck": (data) => {
+            const startIndex = data.indexOf("st_availability_info-value")
+            const endIndex = data.indexOf("<\/span>")
+            const availabilityDivSubstring = data.substring(startIndex, endIndex)
+            return !availabilityDivSubstring.includes("Zapytaj")
         }
     },
 }
