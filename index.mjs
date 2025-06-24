@@ -2,62 +2,37 @@ import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
+import logger, { writeAvailabilityStats } from './logger.mjs';
+import withTimeout from './timeout.mjs'
+import cron from 'node-cron';
+import { readFileSync } from 'fs'
 
 const region = "eu-north-1";
-const dbClient = new DynamoDBClient({ region });
-const secretsClient = new SecretsManagerClient({ region });
 const secretName = "twilio-keys";
-
-const sites = {
-    "canon": {
-        "id": "1",
-        "url": "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/",
-    },
-    "fotoplus": {
-        "id": "2",
-        "url": "https://fotoplus.pl/canon-powershot-g7-x-mark-iii?w=11329&srsltid=AfmBOoq8ZbOrPRDiUonIV1wP_LJdEufND2eCIOMsTF2Az-3mbBn573rBxDo",
-    },
-    "mediamarkt": {
-        "id": "3",
-        "url": "https://mediamarkt.pl/pl/product/_aparat-canon-powershot-g7-x-mark-iii-czarny-1416782.html?srsltid=AfmBOopTAOonXReSXkPzzM6ioBL0Eo1tjlo141A7bl52xNHLLd7FUWAy",
-    },
-}
+const JOB_TIMEOUT_MS = 55000;
+const REPORT_FILE = "./availability_metrics.txt"
 
 const minSmsIntervalHours = 12 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
-export const handler = async (_) => {
-  let twilioApiKey;
-  let accountSid;
-  console.log("Retrieving twilio API key and accountSid")
-  try {
-    const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
-    const secretResponse = await secretsClient.send(secretCommand);
+const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
 
-    const parsedSecret = JSON.parse(secretResponse.SecretString);
-    twilioApiKey = parsedSecret["shopping-api-key"];
-    accountSid = parsedSecret["shopping-api-sid"];
-    if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
-  } catch (err) {
-    console.error("Error retrieving twilio secret:", err);
-    return {
-      statusCode: 500,
-      body: "Error retrieving twilio secret"
-    };
-  }
+const dbClient = new DynamoDBClient({ region });
+const secretsClient = new SecretsManagerClient({ region });
 
+const [twilioApiKey, accountSid] = await getTwilioKeys()
+
+async function runJob() {
   let availability
   try {
     availability = await checkAvailability(sites)
+    writeAvailabilityStats(availability, REPORT_FILE)
   } catch (err) {
-    console.error("Error fetching data:", err);
-    return {
-      statusCode: 500,
-      body: "Error fetching data"
-    };
+    logger.error("Aborting, error fetching data: ", err);
+    return
   }
 
-  console.log(availability)
+  logger.info(availability)
   let anyAvailable = false
   for (let a of availability) {
     if (a["available"]) {
@@ -67,12 +42,10 @@ export const handler = async (_) => {
   }
 
   if (!anyAvailable) {
-      console.log("No products available, skipping")
-      return {
-          statusCode: 200,
-          body: JSON.stringify('Lambda finished successfully'),
-      };
+      logger.info("No products available, skipping")
+      return
   }
+
   const urlsIds = []
   for (let siteData of Object.values(sites)) {
     urlsIds.push({
@@ -87,7 +60,7 @@ export const handler = async (_) => {
     }
   };
 
-  console.log("Retrieving last sent timestamps of the SMS")
+  logger.info("Retrieving last sent timestamps of the SMS")
   const lastSentSmsMessages = {};
   try {
     const getItemCommand = new BatchGetItemCommand(readParams)
@@ -100,11 +73,8 @@ export const handler = async (_) => {
       lastSentSmsMessages[response['ID']['N']] = lastSentDate
     }
   } catch (err) {
-    console.error("DynamoDB error:", err);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error"
-    };
+    logger.error("Aborting because of DynamoDB error: ", err);
+    return
   }
 
   // populate missing data for new rows
@@ -115,7 +85,7 @@ export const handler = async (_) => {
       }
   }
 
-  console.log(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
+  logger.info(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
 
   const putRequests = []
   const smsUrls = []
@@ -136,15 +106,15 @@ export const handler = async (_) => {
           }
       }
       if (!siteAvailability["available"]) {
-          console.log(`No product available for ${siteName}`)
+          logger.info(`No product available for ${siteName}`)
           continue
       }
       const timeDiff = now.getTime() - lastSentDate.getTime()
 
-      console.log(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
+      logger.info(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
       if (siteAvailability["available"]) {
           if (timeDiff < minSmsIntervalMs) {
-              console.log(`Skipping SMS for ${siteName}`)
+              logger.info(`Skipping SMS for ${siteName}`)
           } else {
               putRequests.push({
                   PutRequest: {
@@ -160,14 +130,11 @@ export const handler = async (_) => {
   }
 
   if (smsUrls.length == 0) {
-      console.log("No SMS messages to be sent")
-      return {
-          statusCode: 200,
-          body: JSON.stringify('Lambda finished successfully'),
-      };
+      logger.info("No SMS messages to be sent")
+      return
   }
 
-  console.log("Proceeding with sending SMS")
+  logger.info("Proceeding with sending SMS")
   const writeParams = {
     RequestItems: {
         AvailabilityTimestamp: putRequests
@@ -176,27 +143,33 @@ export const handler = async (_) => {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    console.log("Overwriting the timestamp row")
-    await dbClient.send(command);
+    await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
   } catch (err) {
-    console.error("Error updating DynamoDB:", err);
-    return {
-      statusCode: 500,
-      body: "Error updating DynamoDB"
-    };
+    logger.error("Error sending SMS:", err);
   }
 
   try {
-    await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
+    logger.info("Overwriting the timestamp row")
+    await dbClient.send(command);
   } catch (err) {
-    console.error("Error sending SMS:", err);
-    return {
-      statusCode: 500,
-      body: "Error sending SMS"
-    };
+    logger.error("Aborting, error updating DynamoDB: ", err);
+    return
   }
-  return {
-      statusCode: 200,
-      body: JSON.stringify('Lambda finished successfully'),
-  };
+
 };
+
+async function getTwilioKeys() {
+    logger.info("Retrieving twilio API key and accountSid")
+    const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
+    const secretResponse = await secretsClient.send(secretCommand);
+
+    const parsedSecret = JSON.parse(secretResponse.SecretString);
+    const twilioApiKey = parsedSecret["shopping-api-key"];
+    const accountSid = parsedSecret["shopping-api-sid"];
+    if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
+
+    return [twilioApiKey, accountSid]
+}
+
+cron.schedule('* * * * *', async () => await withTimeout(runJob, JOB_TIMEOUT_MS));
+
