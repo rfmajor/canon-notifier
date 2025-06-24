@@ -81,6 +81,18 @@ const handlers = {
             return !availabilityDivSubstring.includes("Zapytaj")
         }
     },
+    "xkom": {
+        "headless": false,
+        "contentCheck": (data) => {
+            return data.includes('data-name="productTitle"')
+        },
+        "availabilityCheck": (data) => {
+            const startIndex = data.indexOf('data-name="buybox"')
+            const endIndex = data.indexOf('id="anchor_navbar"')
+            const availabilityDivSubstring = data.substring(startIndex, endIndex)
+            return !availabilityDivSubstring.includes("niedostępny")
+        }
+    },
 }
 
 export async function checkAvailability(sites) {
