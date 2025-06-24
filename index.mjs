@@ -3,7 +3,7 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
 import logger from './logger.mjs';
-import { withTimeout } from './timeout.mjs'
+import withTimeout from './timeout.mjs'
 import cron from 'node-cron';
 
 const region = "eu-north-1";
