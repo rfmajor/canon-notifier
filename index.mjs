@@ -2,7 +2,7 @@ import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { sendAvailabilityMessage } from './smsClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
-import logger from './logger.mjs';
+import { logger, writeAvailabilityStats } from './logger.mjs';
 import withTimeout from './timeout.mjs'
 import cron from 'node-cron';
 import { readFileSync } from 'fs'
@@ -10,6 +10,7 @@ import { readFileSync } from 'fs'
 const region = "eu-north-1";
 const secretName = "twilio-keys";
 const JOB_TIMEOUT_MS = 55000;
+const REPORT_FILE = "./availability_metrics.txt"
 
 const minSmsIntervalHours = 12 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
@@ -25,6 +26,7 @@ async function runJob() {
   let availability
   try {
     availability = await checkAvailability(sites)
+    writeAvailabilityStats(availability, REPORT_FILE)
   } catch (err) {
     logger.error("Aborting, error fetching data: ", err);
     return

@@ -98,7 +98,7 @@ export async function checkAvailability(sites) {
         return resolvedPromises
     } catch (err) {
         logger.error("Checking availabilities failed: " + err)
-        return null
+        return {}
     } finally {
         if (browser) {
             await browser.close()
@@ -109,22 +109,23 @@ export async function checkAvailability(sites) {
 async function checkSite(siteName, siteUrl, browser) {
     logger.info(`Checking ${siteName} availability`)
     let available = false
+    let error
     try {
         if (!(siteName in handlers)) {
             throw Error(`No handler found for ${siteName}`)
         }
         const handler = handlers[siteName]
         if (!handler['headless']) {
-            available = await checkNormal(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'])
+            [available, error] = await checkNormal(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'])
         } else {
-            available = await checkHeadless(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'], browser)
+            [available, error] = await checkHeadless(siteName, siteUrl, handler['contentCheck'], handler['availabilityCheck'], browser)
         }
-    } catch (error) {
-        logger.error(error.message)
-        available = false
+    } catch (err) {
+        logger.error(err.message)
+        error = err
     }
 
-    return {"siteName": siteName, "available": available}
+    return {"siteName": siteName, "available": available, "error": error ? error.message : null}
 }
 
 async function checkNormal(siteName, url, contentCheck, availabilityCheck) {
@@ -138,11 +139,11 @@ async function checkNormal(siteName, url, contentCheck, availabilityCheck) {
             if (!contentCheck(data)) {
                 throw new Error(`No content loaded for ${siteName}, you might need to use a headless browser`)
             }
-            return availabilityCheck(data)
+            return [availabilityCheck(data)]
         }, FUNCTION_TIMEOUT_MS)
     } catch (err) {
         logger.error(`Error while checking ${siteName} availability: ${err}`)
-        return false
+        return [false, err]
     }
 }
 
@@ -161,11 +162,11 @@ async function checkHeadless(siteName, url, contentCheck, availabilityCheck, bro
                 throw Error(`No content loaded for ${siteName}, it might be blocked by captcha`)
             }
 
-            return await availabilityCheck(page)
+            return [await availabilityCheck(page)]
         }, FUNCTION_TIMEOUT_MS)
     } catch (err) {
         logger.error(`Error while checking ${siteName} availability: ${err}`)
-        return false
+        return [false, err]
     } finally {
         await page.close()
     }
@@ -183,4 +184,5 @@ async function randomizeUserAgent(page) {
       height: Math.floor(768 + Math.random() * 100),
     });
 }
+
 
