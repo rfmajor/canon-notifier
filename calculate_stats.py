@@ -1,6 +1,7 @@
 import sys
 import json
 import pprint
+from collections import OrderedDict
 
 def main():
     if len(sys.argv) < 2:
@@ -14,6 +15,7 @@ def main():
     availables = {}
 
     with open(filename, 'r', encoding='utf-8') as file:
+        latest_timestamp = None
         for line in file:
             row = json.loads(line)
             for availability in row["availability"]:
@@ -34,8 +36,15 @@ def main():
                 successes[site_name] += 1
                 availables[site_name] += 1 if availability["available"] else 0
             all_invocations += 1
-    stats = {"allInvocations": all_invocations, "invocations": invocations,
-             "successes": successes, "errors": errors, "availables": availables}
+            latest_timestamp = row["timestamp"]
+    stats = OrderedDict({
+                "allInvocations": all_invocations,
+                "latestTimestamp": latest_timestamp,
+                "invocations": invocations,
+                "successes": successes,
+                "errors": errors,
+                "availables": availables
+            })
 
     pprint.pprint(stats)
 
