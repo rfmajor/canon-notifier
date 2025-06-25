@@ -15,7 +15,7 @@ export async function sendSMSMessage(accountSid, twilioApiKey, urls) {
 
 export async function sendMailMessage(sendGridApiKey, urls, recipients) {
     sgMail.setApiKey(sendGridApiKey)
-    for (const recipient in recipients) {
+    for (const recipient of recipients) {
         logger.info(`Sending an email about availability to ${recipient}`)
         const msg = {
             to: recipient,
