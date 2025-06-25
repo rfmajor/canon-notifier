@@ -53,8 +53,8 @@ const handlers = {
             return !!cardOffer
         },
         "availabilityCheck": async (page) => {
-            const notifyLayer = await page.$("[data-addclass='notify-layer']")
-            return !notifyLayer
+            const availability = await page.$(".availability-in-stock_-")
+            return !!availability
         }
     },
     "fotoforma": {
