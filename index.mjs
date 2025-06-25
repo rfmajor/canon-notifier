@@ -1,6 +1,6 @@
 import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { sendAvailabilityMessage } from './smsClient.mjs'
+import { sendSMSMessage, sendMailMessage } from './messageClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
 import logger, { writeAvailabilityStats } from './logger.mjs';
 import withTimeout from './timeout.mjs'
@@ -8,7 +8,6 @@ import cron from 'node-cron';
 import { readFileSync } from 'fs'
 
 const region = "eu-north-1";
-const secretName = "twilio-keys";
 const JOB_TIMEOUT_MS = 55000;
 const REPORT_FILE = "./availability_metrics.txt"
 
@@ -20,7 +19,9 @@ const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 
-const [twilioApiKey, accountSid] = await getTwilioKeys()
+const [twilioApiKey, accountSid] = await getSecrets("twilio-keys", "shopping-api-key", "shopping-api-sid")
+const [sendGridApiKey] = await getSecrets("sendgrid-keys", "sendgrid-api-key")
+const mailRecipients = ["rfmajor99@gmail.com"]
 
 async function runJob() {
   let availability
@@ -88,7 +89,7 @@ async function runJob() {
   logger.info(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
 
   const putRequests = []
-  const smsUrls = []
+  const messageUrls = []
   const now = new Date();
   for (let [siteId, lastSentDate] of Object.entries(lastSentSmsMessages)) {
       let siteName = ''
@@ -124,12 +125,12 @@ async function runJob() {
                       }
                   }
               })
-              smsUrls.push(sites[siteName]["url"])
+              messageUrls.push(sites[siteName]["url"])
           }
       }
   }
 
-  if (smsUrls.length == 0) {
+  if (messageUrls.length == 0) {
       logger.info("No SMS messages to be sent")
       return
   }
@@ -143,9 +144,10 @@ async function runJob() {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    await sendAvailabilityMessage(accountSid, twilioApiKey, smsUrls)
+    await sendSMSMessage(accountSid, twilioApiKey, messageUrls)
+    await sendMailMessage(sendGridApiKey, messageUrls, mailRecipients)
   } catch (err) {
-    logger.error("Error sending SMS:", err);
+    logger.error("Error sending messages:", err);
   }
 
   try {
@@ -158,17 +160,21 @@ async function runJob() {
 
 };
 
-async function getTwilioKeys() {
-    logger.info("Retrieving twilio API key and accountSid")
+async function getSecrets(secretName, ...secrets) {
+    logger.info(`Retrieving secrets from ${secretName}`)
     const secretCommand = new GetSecretValueCommand({ SecretId: secretName });
     const secretResponse = await secretsClient.send(secretCommand);
 
     const parsedSecret = JSON.parse(secretResponse.SecretString);
-    const twilioApiKey = parsedSecret["shopping-api-key"];
-    const accountSid = parsedSecret["shopping-api-sid"];
-    if (!twilioApiKey) throw new Error("shopping-api-key not found in secret");
+    const parsedSecrets = []
+    for (const secret in secrets) {
+        if (!(secret in parsedSecret)) {
+            throw new Error(`${secret} not found in secret: ${secretName}`);
+        }
+        parsedSecrets.push(parsedSecret[secret])
+    }
 
-    return [twilioApiKey, accountSid]
+    return parsedSecrets
 }
 
 cron.schedule('* * * * *', async () => await withTimeout(runJob, JOB_TIMEOUT_MS));
