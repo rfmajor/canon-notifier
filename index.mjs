@@ -167,7 +167,7 @@ async function getSecrets(secretName, ...secrets) {
 
     const parsedSecret = JSON.parse(secretResponse.SecretString);
     const parsedSecrets = []
-    for (const secret in secrets) {
+    for (const secret of secrets) {
         if (!(secret in parsedSecret)) {
             throw new Error(`${secret} not found in secret: ${secretName}`);
         }
