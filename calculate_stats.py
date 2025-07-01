@@ -6,6 +6,7 @@ from dateutil import parser
 CEST_ZONE = ZoneInfo("Europe/Warsaw")
 H_M_FORMAT = "%H:%M"
 D_H_M_FORMAT = "%Y-%m-%d %H:%M"
+D_H_M_S_FORMAT = "%Y-%m-%d %H:%M:%S"
 D_FORMAT = "%Y-%m-%d"
 
 def calculate_stats():
@@ -17,7 +18,6 @@ def calculate_stats():
     availables = {}
     last_successful_timestamps = {}
     last_available_timestamps = {}
-    table_format = "| {:<15} | {:<15} | {:<15} | {:<30} | {:<15} | {:<15} | {:<30}|"
 
     with open(filename, 'r', encoding='utf-8') as file:
         latest_timestamp = None
@@ -48,19 +48,19 @@ def calculate_stats():
                 if availability["available"]:
                     last_available_timestamps[site_name] = latest_timestamp
 
-    header = table_format.format("Site", "Invocations", "Successes",
-                              "Last success", "Errors", "Availables",
-                              "Last available")
-    divider = "-" * len(header)
-    print(divider)
-    print(header)
-    print(divider)
+    rows = []
     for k in invocations:
-        print(table_format.format(k, invocations[k], successes[k],
-                                  last_successful_timestamps.get(k, "None"),
-                                  errors[k], availables[k],
-                                  last_available_timestamps.get(k, "None")))
-    print(divider)
+        last_successful = last_successful_timestamps.get(k, "None")
+        if last_successful != "None":
+            last_successful = parse_date(last_successful).strftime(D_H_M_S_FORMAT)
+        last_available = last_available_timestamps.get(k, "None")
+        if last_available != "None":
+            last_available = parse_date(last_available).strftime(D_H_M_S_FORMAT)
+        rows.append([k, invocations[k], successes[k], last_successful,
+                     errors[k], availables[k], last_available])
+
+    print(as_table(["Site", "Invocations", "Successes", "Last success (CEST)",
+                    "Errors", "Availables", "Last available (CEST)"], rows))
 
 
 def calculate_availability_periods():
@@ -68,7 +68,6 @@ def calculate_availability_periods():
     was_available = {}
     current_period = {}
     saved_period = {}
-    table_format = "| {:<15} | {:<40}|"
     with open(filename, 'r', encoding='utf-8') as file:
         for line in file:
             row = json.loads(line)
@@ -98,14 +97,10 @@ def calculate_availability_periods():
             if current_period[site_name] is not None:
                 saved_period[site_name].append(current_period[site_name])
 
-    header = table_format.format("Site", "Availability periods (CEST)")
-    divider = "-" * len(header)
-    print(divider)
-    print(header)
-    print(divider)
+    rows = []
     for site_name in saved_period:
         date_str = ""
-        first_it = True
+        dates = []
         for p in reversed(saved_period[site_name]):
             d_from = parse_date(p[0])
             if p[1] is None:
@@ -117,18 +112,69 @@ def calculate_availability_periods():
                     date_str = f"{d_from.strftime(H_M_FORMAT)} - {d_to.strftime(H_M_FORMAT)}, {d_from.strftime(D_FORMAT)}"
                 else:
                     date_str = f"{d_from.strftime(D_H_M_FORMAT)} - {d_to.strftime(D_H_M_FORMAT)}"
-            if first_it:
-                print(table_format.format(site_name, date_str))
-            else:
-                print(table_format.format("", date_str))
-            if first_it:
-                first_it = False
-    print(divider)
+            dates.append(date_str)
+        if len(dates) > 0:
+            rows.append([site_name, dates])
+    print(as_table(["Site", "Availability periods (CEST)"], rows))
 
 
 def parse_date(timestamp):
     return parser.parse(timestamp).astimezone(CEST_ZONE)
 
+
+def as_table(header, rows):
+    for r in rows:
+        if len(header) != len(r):
+            raise Exception("Header and rows need to have the same length")
+    result = ""
+    widths = [0] * len(header)
+    for i, item in enumerate(header):
+        if len(item) > widths[i]:
+            widths[i] = len(item)
+    for row in rows:
+        for i, col in enumerate(row):
+            if isinstance(col, list):
+                for c in col:
+                    if len(c) > widths[i]:
+                        widths[i] = len(c)
+            else:
+                str_len = len(str(col))
+                if str_len > widths[i]:
+                    widths[i] = str_len
+    table_format = "| " + " | ".join(["{:<" + str(w) + "}" for w in widths]) + " |"
+    t_header = table_format.format(*header)
+    t_divider = "-" * len(t_header)
+
+    result += f"{t_divider}\n"
+    result += f"{t_header}\n"
+    result += f"{t_divider}\n"
+
+    for r in rows:
+        col_max_items = max([len(col) if isinstance(col, list) else 1 for col in r])
+        if col_max_items > 1:
+            col_idx = 0
+            while col_idx < col_max_items:
+                cols = []
+                for col in r:
+                    if isinstance(col, list):
+                        if len(col) > col_idx:
+                            cols.append(col[col_idx])
+                        else:
+                            cols.append("")
+                    elif col_idx == 0:
+                        cols.append(col)
+                    else:
+                        cols.append("")
+                t_row = table_format.format(*cols)
+                result += f"{t_row}\n"
+                col_idx += 1
+        else:
+            t_row = table_format.format(*r)
+            result += f"{t_row}\n"
+
+    result += f"{t_divider}\n"
+
+    return result
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
