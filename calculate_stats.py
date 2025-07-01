@@ -90,6 +90,7 @@ def calculate_availability_periods():
                     was_available[site_name] = True
                 else:
                     if was_available[site_name]:
+                        current_period[site_name][1] = timestamp
                         saved_period[site_name].append(current_period[site_name])
                         current_period[site_name] = None
                     was_available[site_name] = False
