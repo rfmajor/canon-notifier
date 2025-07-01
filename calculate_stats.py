@@ -104,7 +104,7 @@ def calculate_availability_periods():
         for p in reversed(saved_period[site_name]):
             d_from = parse_date(p[0])
             if p[1] is None:
-                date_str = f"{d_from} - present"
+                date_str = f"{d_from.strftime(H_M_FORMAT)} - present, {d_from.strftime(D_FORMAT)}"
             else:
                 d_to = parse_date(p[1])
 
