@@ -13,7 +13,7 @@ def main():
     availables = {}
     last_successful_timestamps = {}
     last_available_timestamps = {}
-    table_format = "{:<15} {:<15} {:<15} {:<30} {:<15} {:<15} {:<30}"
+    table_format = "| {:<15} | {:<15} | {:<15} | {:<30} | {:<15} | {:<15} | {:<30}|"
 
     with open(filename, 'r', encoding='utf-8') as file:
         latest_timestamp = None
@@ -44,13 +44,18 @@ def main():
                 if availability["available"]:
                     last_available_timestamps[site_name] = latest_timestamp
 
-    print(table_format.format("Site", "Invocations", "Successes",
+    header = table_format.format("Site", "Invocations", "Successes",
                               "Last success", "Errors", "Availables",
-                              "Last available"))
+                              "Last available")
+    divider = "-" * len(header)
+    print(divider)
+    print(header)
+    print(divider)
     for k in invocations:
         print(table_format.format(k, invocations[k], successes[k],
                                   last_successful_timestamps.get(k, "None"),
                                   errors[k], availables[k],
                                   last_available_timestamps.get(k, "None")))
+    print(divider)
 
 main()
