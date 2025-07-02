@@ -1,6 +1,6 @@
 import { DynamoDBClient, BatchGetItemCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { sendSMSMessage, sendMailMessage } from './messageClient.mjs'
+import { sendSMSMessage, sendMailMessage, callPhone } from './messageClient.mjs'
 import { checkAvailability } from './availabilityCheck.mjs'
 import logger, { writeAvailabilityStats } from './logger.mjs';
 import withTimeout from './timeout.mjs'
@@ -146,6 +146,7 @@ async function runJob() {
   try {
     await sendSMSMessage(accountSid, twilioApiKey, messageUrls)
     await sendMailMessage(sendGridApiKey, messageUrls, mailRecipients)
+    await callPhone(accountSid, twilioApiKey)
   } catch (err) {
     logger.error("Error sending messages:", err);
   }

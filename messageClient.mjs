@@ -29,3 +29,14 @@ export async function sendMailMessage(sendGridApiKey, urls, recipients) {
             .catch((error) => { logger.error(error) })
     }
 }
+
+export async function callPhone(accountSid, twilioApiKey) {
+  const twilioClient = twilio(accountSid, twilioApiKey);
+  logger.info("Calling to notify about availability")
+
+  await twilioClient.calls.create({
+    from: "+12184005231",
+    to: "+48515050764",
+    url: "https://demo.twilio.com/welcome/voice/",
+  });
+}
