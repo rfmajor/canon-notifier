@@ -6,7 +6,7 @@ export async function sendSMSMessage(accountSid, twilioApiKey, urls) {
     const twilioClient = twilio(accountSid, twilioApiKey);
     logger.info("Sending the SMS about availability")
     await twilioClient.messages.create({
-      body: `Found new available products:\n${urls.join("\n")}`,
+      body: `Found new available products:\n${urls.join("\n").replaceAll("_", "%5D")}`,
       messagingServiceSid: 'MGb1ec5e8e4e7b2608d79542695b053f7b',
       to: '+48515050764'
     })
