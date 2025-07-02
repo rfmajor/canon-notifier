@@ -93,6 +93,17 @@ const handlers = {
             return !innerText.includes("niedostępny")
         }
     },
+    "mediaexpert": {
+        "headless": true,
+        "contentCheck": async (page) => {
+            const productGalleryView = await page.$(".product-gallery-view")
+            return !!productGalleryView
+        },
+        "availabilityCheck": async (page) => {
+            const addToCartButton = await page.$('[cy="addToCartButton"]')
+            return !!addToCartButton
+        }
+    },
 }
 
 export async function checkAvailability(sites) {
