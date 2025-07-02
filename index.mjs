@@ -11,7 +11,7 @@ const region = "eu-north-1";
 const JOB_TIMEOUT_MS = 55000;
 const REPORT_FILE = "./availability_metrics.txt"
 
-const minSmsIntervalHours = 12 
+const minSmsIntervalHours = 1 
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
 const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
