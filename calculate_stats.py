@@ -170,7 +170,8 @@ def as_table(header, rows):
                 result += f"{t_row}\n"
                 col_idx += 1
         else:
-            t_row = table_format.format(*r)
+            flat_r = [c[0] if isinstance(c, list) else c for c in r]
+            t_row = table_format.format(*flat_r)
             result += f"{t_row}\n"
 
     result += f"{t_divider}\n"
