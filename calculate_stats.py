@@ -99,15 +99,18 @@ def calculate_availability_periods():
                 saved_period[site_name].append(current_period[site_name])
 
     rows = []
+    site_to_recent_date = {}
     for site_name in saved_period:
         date_str = ""
         dates = []
         for p in reversed(saved_period[site_name]):
             d_from = parse_date(p[0])
             if p[1] is None:
+                site_to_recent_date[site_name] = None # present
                 date_str = f"{d_from.strftime(H_M_FORMAT)} - present, {d_from.strftime(D_FORMAT)}"
             else:
                 d_to = parse_date(p[1])
+                site_to_recent_date[site_name] = d_to
 
                 if d_from.day == d_to.day:
                     date_str = f"{d_from.strftime(H_M_FORMAT)} - {d_to.strftime(H_M_FORMAT)}, {d_from.strftime(D_FORMAT)}"
@@ -116,6 +119,7 @@ def calculate_availability_periods():
             dates.append(date_str)
         if len(dates) > 0:
             rows.append([site_name, dates])
+    rows = sorted(rows, key=lambda r: site_to_recent_date[r[0]], reverse=True)
     print(as_table(["Site", "Availability periods (CEST)"], rows))
 
 
