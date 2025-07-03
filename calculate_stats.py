@@ -1,7 +1,9 @@
 import sys
 import json
 from zoneinfo import ZoneInfo
+from datetime import datetime
 from dateutil import parser
+
 
 CEST_ZONE = ZoneInfo("Europe/Warsaw")
 H_M_FORMAT = "%H:%M"
@@ -106,11 +108,13 @@ def calculate_availability_periods():
         for p in reversed(saved_period[site_name]):
             d_from = parse_date(p[0])
             if p[1] is None:
-                site_to_recent_date[site_name] = None # present
+                if site_name not in site_to_recent_date:
+                    site_to_recent_date[site_name] = datetime.now()
                 date_str = f"{d_from.strftime(H_M_FORMAT)} - present, {d_from.strftime(D_FORMAT)}"
             else:
                 d_to = parse_date(p[1])
-                site_to_recent_date[site_name] = d_to
+                if site_name not in site_to_recent_date:
+                    site_to_recent_date[site_name] = d_to
 
                 if d_from.day == d_to.day:
                     date_str = f"{d_from.strftime(H_M_FORMAT)} - {d_to.strftime(H_M_FORMAT)}, {d_from.strftime(D_FORMAT)}"
