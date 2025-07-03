@@ -89,7 +89,7 @@ async function runJob() {
   logger.info(`Last sent SMS messages: ${JSON.stringify(lastSentSmsMessages)}`)
 
   const putRequests = []
-  const messageUrls = []
+  const messageEligibleSites = []
   const now = new Date();
   for (let [siteId, lastSentDate] of Object.entries(lastSentSmsMessages)) {
       let siteName = ''
@@ -125,12 +125,12 @@ async function runJob() {
                       }
                   }
               })
-              messageUrls.push(sites[siteName]["url"])
+              messageEligibleSites.push({"name": siteName, "url": sites[siteName]["url"]})
           }
       }
   }
 
-  if (messageUrls.length == 0) {
+  if (messageEligibleSites.length == 0) {
       logger.info("No SMS messages to be sent")
       return
   }
@@ -144,8 +144,8 @@ async function runJob() {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    await sendSMSMessage(accountSid, twilioApiKey, messageUrls)
-    await sendMailMessage(sendGridApiKey, messageUrls, mailRecipients)
+    await sendSMSMessage(accountSid, twilioApiKey, messageEligibleSites)
+    await sendMailMessage(sendGridApiKey, messageEligibleSites, mailRecipients)
     await callPhone(accountSid, twilioApiKey)
   } catch (err) {
     logger.error("Error sending messages:", err);
