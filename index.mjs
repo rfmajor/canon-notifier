@@ -15,6 +15,7 @@ const minSmsIntervalHours = 1
 const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
 
 const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
+const minSmsIntervalsHours = JSON.parse(readFileSync('smsIntervals.json', { encoding: 'utf8', flag: 'r' }))
 
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
@@ -113,6 +114,8 @@ async function runJob() {
       const timeDiff = now.getTime() - lastSentDate.getTime()
 
       logger.info(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
+      const minSmsIntervalHours = siteName in minSmsIntervalHours ? minSmsIntervalsHours[siteName] : 1
+      const minSmsIntervalMs = minSmsIntervalHours * 60 * 60 * 1000
       if (siteAvailability["available"]) {
           if (timeDiff < minSmsIntervalMs) {
               logger.info(`Skipping SMS for ${siteName}`)
