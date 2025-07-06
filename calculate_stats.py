@@ -84,6 +84,8 @@ def calculate_availability_periods():
                 if site_name not in saved_period:
                     saved_period[site_name] = []
 
+                if availability["error"]:
+                    continue
                 if availability["available"]:
                     if was_available[site_name]:
                         current_period[site_name][1] = timestamp
