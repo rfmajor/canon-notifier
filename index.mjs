@@ -11,9 +11,6 @@ const region = "eu-north-1";
 const JOB_TIMEOUT_MS = 55000;
 const REPORT_FILE = "./availability_metrics.txt"
 
-const minSmsIntervalHours = 1 
-const minSmsIntervalMs = 1000 * 60 * 60 * minSmsIntervalHours
-
 const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
 const minSmsIntervalsHours = JSON.parse(readFileSync('smsIntervals.json', { encoding: 'utf8', flag: 'r' }))
 
@@ -114,22 +111,20 @@ async function runJob() {
       const timeDiff = now.getTime() - lastSentDate.getTime()
 
       logger.info(`${siteName} is available, last SMS was sent on ${lastSentDate} (${parseInt(timeDiff / 1000 / 60 / 60)} hours ago)`)
-      const minSmsIntervalHours = siteName in minSmsIntervalHours ? minSmsIntervalsHours[siteName] : 1
-      const minSmsIntervalMs = minSmsIntervalHours * 60 * 60 * 1000
-      if (siteAvailability["available"]) {
-          if (timeDiff < minSmsIntervalMs) {
-              logger.info(`Skipping SMS for ${siteName}`)
-          } else {
-              putRequests.push({
-                  PutRequest: {
-                      Item: {
-                          ID: { N: siteId },
-                          Timestamp: { S: now.toISOString() }
-                      }
+      const minIntervalHours = siteName in minSmsIntervalsHours ? minSmsIntervalsHours[siteName] : 1
+      const minIntervalMs = minIntervalHours * 60 * 60 * 1000
+      if (timeDiff < minIntervalMs) {
+          logger.info(`Skipping SMS for ${siteName}`)
+      } else {
+          putRequests.push({
+              PutRequest: {
+                  Item: {
+                      ID: { N: siteId },
+                      Timestamp: { S: now.toISOString() }
                   }
-              })
-              messageEligibleSites.push({"name": siteName, "url": sites[siteName]["url"]})
-          }
+              }
+          })
+          messageEligibleSites.push({"name": siteName, "url": sites[siteName]["url"]})
       }
   }
 
