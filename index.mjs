@@ -19,7 +19,7 @@ const secretsClient = new SecretsManagerClient({ region });
 
 const [twilioApiKey, accountSid] = await getSecrets("twilio-keys", "shopping-api-key", "shopping-api-sid")
 const [sendGridApiKey] = await getSecrets("sendgrid-keys", "sendgrid-api-key")
-const mailRecipients = ["rfmajor99@gmail.com"]
+const mailRecipients = ["rfmajor99@gmail.com", "alicia01kl@gmail.com"]
 
 async function runJob() {
   let availability
