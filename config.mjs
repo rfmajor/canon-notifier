@@ -1,4 +1,37 @@
-{
+const config = { }
+
+config.job = {}
+config.job.timeoutMs = 55000
+config.job.schedule = '* * * * *'
+config.awsRegion = 'eu-north-1'
+
+config.sms = {}
+config.mail = {}
+config.call = {}
+config.sms.intervals = {
+    "canon": 1,
+    "fotoplus": 1,
+    "mediamarkt": 1,
+    "cyfrowe": 1,
+    "fotoforma": 1,
+    "fotopoker": 1,
+    "mediaexpert": 12
+}
+config.sms.recipients = [
+    "+48515050764"
+]
+config.sms.messagingServiceId = 'MGb1ec5e8e4e7b2608d79542695b053f7b'
+config.mail.recipients = [
+    "rfmajor99@gmail.com",
+    "alicia01kl@gmail.com"
+]
+config.mail.sender = 'canon-availability@filipmajor.com'
+config.call.recipients = [
+    "+48515050764"
+]
+config.call.caller = "+12184005231"
+config.call.url = "https://demo.twilio.com/welcome/voice/"
+config.sites = {
     "canon": {
         "id": "1",
         "url": "https://www.canon.pl/store/canon-kompaktowy-aparat-canon-powershot-g7-x-mark-iii-czarny/3637C002/"
@@ -28,3 +61,17 @@
         "url": "https://www.mediaexpert.pl/foto-i-kamery/aparaty-fotograficzne/aparat-cyfrowy/aparat-canon-powershot-g7-x-iii-bk-eu26"
     }
 }
+config.twilio = {}
+config.twilio.secretName = 'twilio-keys'
+config.twilio.secrets = [
+    'shopping-api-key',
+    'shopping-api-sid'
+]
+config.sendGrid = {}
+config.sendGrid.secretName = 'sendgrid-keys'
+config.sendGrid.secrets = [
+    'sendgrid-api-key'
+]
+config.reportFile = './availability_metrics.txt'
+
+export default config

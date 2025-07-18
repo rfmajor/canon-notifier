@@ -5,27 +5,24 @@ import { checkAvailability } from './availabilityCheck.mjs'
 import logger, { writeAvailabilityStats } from './logger.mjs';
 import withTimeout from './timeout.mjs'
 import cron from 'node-cron';
-import { readFileSync } from 'fs'
+import config from './config.mjs'
 
-const region = "eu-north-1";
-const JOB_TIMEOUT_MS = 55000;
-const REPORT_FILE = "./availability_metrics.txt"
+const region = config.awsRegion
 
-const sites = JSON.parse(readFileSync('./sites.json', { encoding: 'utf8', flag: 'r' }))
-const minSmsIntervalsHours = JSON.parse(readFileSync('smsIntervals.json', { encoding: 'utf8', flag: 'r' }))
+const sites = config.sites
+const minSmsIntervalsHours = config.sms.intervals
 
 const dbClient = new DynamoDBClient({ region });
 const secretsClient = new SecretsManagerClient({ region });
 
-const [twilioApiKey, accountSid] = await getSecrets("twilio-keys", "shopping-api-key", "shopping-api-sid")
-const [sendGridApiKey] = await getSecrets("sendgrid-keys", "sendgrid-api-key")
-const mailRecipients = ["rfmajor99@gmail.com", "alicia01kl@gmail.com"]
+const [twilioApiKey, accountSid] = await getSecrets(config.twilio.secretName, ...config.twilio.secrets)
+const [sendGridApiKey] = await getSecrets(config.sendGrid.secretName, ...config.sendGrid.secrets)
 
 async function runJob() {
   let availability
   try {
     availability = await checkAvailability(sites)
-    writeAvailabilityStats(availability, REPORT_FILE)
+    writeAvailabilityStats(availability, config.reportFile)
   } catch (err) {
     logger.error("Aborting, error fetching data: ", err);
     return
@@ -142,9 +139,12 @@ async function runJob() {
   const command = new BatchWriteItemCommand(writeParams)
 
   try {
-    await sendSMSMessage(accountSid, twilioApiKey, messageEligibleSites)
-    await sendMailMessage(sendGridApiKey, messageEligibleSites, mailRecipients)
-    await callPhone(accountSid, twilioApiKey)
+    await sendSMSMessage(accountSid, twilioApiKey, messageEligibleSites,
+        config.sms.recipients, config.sms.messagingServiceId)
+    await sendMailMessage(sendGridApiKey, messageEligibleSites, 
+        config.mail.recipients, config.mail.sender)
+    await callPhone(accountSid, twilioApiKey, 
+        config.call.recipients, config.call.caller, config.call.url)
   } catch (err) {
     logger.error("Error sending messages:", err);
   }
@@ -176,5 +176,4 @@ async function getSecrets(secretName, ...secrets) {
     return parsedSecrets
 }
 
-cron.schedule('* * * * *', async () => await withTimeout(runJob, JOB_TIMEOUT_MS));
-
+cron.schedule(config.job.schedule, async () => await withTimeout(runJob, config.job.timeoutMs));
