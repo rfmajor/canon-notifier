@@ -10,11 +10,16 @@ const FUNCTION_TIMEOUT_MS = 20000
 
 const handlers = {
     "canon": {
-        "headless": false,
-        "contentCheck": (data) => {
-            return data.includes('sf-product-detail-page')
+        "headless": true,
+        "contentCheck": async (page) => {
+            const price = await page.$('[data-testid=product-tile-price]')
+            return !!price
         },
-        "availabilityCheck": (data) => !data.includes("chakra-text css-19qxpy"),
+        "availabilityCheck": async (page) => {
+            const availabilityElement = await page.$('[data-testid=sf-stock-messaging-static]')
+            const innerText = await page.evaluate(el => el.innerText, availabilityElement);
+            return innerText.includes("Dostępne")
+        }
     },
     "fotoplus": {
         "headless": false,
