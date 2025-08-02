@@ -11,6 +11,7 @@ D_H_M_FORMAT = "%Y-%m-%d %H:%M"
 D_H_M_S_FORMAT = "%Y-%m-%d %H:%M:%S"
 D_FORMAT = "%Y-%m-%d"
 
+
 def calculate_stats():
     filename = sys.argv[1]
     all_invocations = 0
@@ -21,7 +22,7 @@ def calculate_stats():
     last_successful_timestamps = {}
     last_available_timestamps = {}
 
-    with open(filename, 'r', encoding='utf-8') as file:
+    with open(filename, "r", encoding="utf-8") as file:
         latest_timestamp = None
         for line in file:
             row = json.loads(line)
@@ -58,11 +59,32 @@ def calculate_stats():
         last_available = last_available_timestamps.get(k, "None")
         if last_available != "None":
             last_available = parse_date(last_available).strftime(D_H_M_S_FORMAT)
-        rows.append([k, invocations[k], successes[k], last_successful,
-                     errors[k], availables[k], last_available])
+        rows.append(
+            [
+                k,
+                invocations[k],
+                successes[k],
+                last_successful,
+                errors[k],
+                availables[k],
+                last_available,
+            ]
+        )
 
-    print(as_table(["Site", "Invocations", "Successes", "Last success (CEST)",
-                    "Errors", "Availables", "Last available (CEST)"], rows))
+    print(
+        as_table(
+            [
+                "Site",
+                "Invocations",
+                "Successes",
+                "Last success (CEST)",
+                "Errors",
+                "Availables",
+                "Last available (CEST)",
+            ],
+            rows,
+        )
+    )
 
 
 def calculate_availability_periods():
@@ -70,7 +92,7 @@ def calculate_availability_periods():
     was_available = {}
     current_period = {}
     saved_period = {}
-    with open(filename, 'r', encoding='utf-8') as file:
+    with open(filename, "r", encoding="utf-8") as file:
         for line in file:
             row = json.loads(line)
             timestamp = row["timestamp"]
@@ -188,7 +210,8 @@ def as_table(header, rows):
 
     return result
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise Exception("No filename provided")
     calculate_stats()
